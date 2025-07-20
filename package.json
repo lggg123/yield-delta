@@ -1,7 +1,7 @@
 {
-    "name": "@elizaos-plugins/plugin-sei",
-    "version": "0.25.6-alpha.1",
-    "type": "module",
+    "name": "yield-delta",
+    "version": "1.0.0",
+    "description": "Advanced DeFi yield optimization and arbitrage strategies for SEI blockchain",
     "main": "dist/index.js",
     "module": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -32,6 +32,13 @@
         "test:watch": "vitest --watch",
         "test:coverage": "vitest --coverage"
     },
+    "keywords": [
+        "defi",
+        "arbitrage",
+        "yield-farming",
+        "sei-blockchain",
+        "typescript"
+    ],
     "peerDependencies": {
         "form-data": "4.0.1",
         "whatwg-url": "7.1.0"

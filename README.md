@@ -8,12 +8,6 @@ This plugin provides functionality to:
 - Transfer SEI tokens to other `0x` or `sei` addresses
 - Query wallet balances
 
-## Installation
-
-```bash
-pnpm install @elizaos/plugin-sei
-```
-
 ## Configuration
 
 The plugin requires the following environment variables:
@@ -86,6 +80,42 @@ pnpm build
 
 ```bash
 pnpm test
+```
+
+# Yield Delta
+
+Advanced DeFi yield optimization and arbitrage strategies for SEI blockchain.
+
+## Features
+
+- **DragonSwap Integration**: Automated token swapping with optimal routing
+- **Funding Rate Arbitrage**: Cross-exchange arbitrage opportunities
+- **Perpetual Trading**: Leveraged position management
+- **Portfolio Rebalancing**: Automated asset allocation strategies
+
+## Installation
+
+```bash
+npm install yield-delta
+```
+
+## Usage
+
+```typescript
+import { yieldDeltaActions } from 'yield-delta';
+
+// Add to your Eliza agent
+const agent = new Agent({
+  actions: [...yieldDeltaActions]
+});
+```
+
+## Development
+
+```bash
+npm install
+npm run build
+npm test
 ```
 
 ## Future Enhancements

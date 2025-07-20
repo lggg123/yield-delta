@@ -8,7 +8,7 @@ import {
 } from "@elizaos/core";
 import { validateSeiConfig } from "../environment";
 import { WalletProvider, seiChains } from "../providers/wallet";
-import { SeiOracleProvider } from "../providers/oracle";
+import { SeiOracleProvider } from "../providers/sei-oracle";
 import { encodeFunctionData } from 'viem';
 
 export interface PerpsTradeParams {
