@@ -8,7 +8,25 @@ import {
 } from "@elizaos/core";
 import { validateSeiConfig } from "../environment";
 import { WalletProvider, seiChains } from "../providers/wallet";
-import { erc20Abi, encodeFunctionData } from 'viem';
+import { erc20Abi, encodeFunctionData, getAddress } from 'viem';
+
+// DragonSwap router ABI for swap operations
+const swapRouterAbi = [
+  {
+    inputs: [
+      { name: 'tokenIn', type: 'address' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOutMinimum', type: 'uint256' },
+      { name: 'recipient', type: 'address' },
+      { name: 'deadline', type: 'uint256' }
+    ],
+    name: 'exactInputSingle',
+    outputs: [{ name: 'amountOut', type: 'uint256' }],
+    stateMutability: 'payable',
+    type: 'function'
+  }
+] as const;
 
 export interface DragonSwapTradeParams {
   tokenIn: string;
@@ -40,8 +58,8 @@ class DragonSwapAPI {
     
     // Replace with actual DragonSwap router contract addresses
     this.routerAddress = isTestnet 
-      ? '0x...' as `0x${string}`  // Testnet router
-      : '0x...' as `0x${string}`; // Mainnet router
+      ? '0x1234567890123456789012345678901234567890' as `0x${string}`  // Mock testnet router
+      : '0x1234567890123456789012345678901234567890' as `0x${string}`; // Mock mainnet router
   }
 
   async getPoolInfo(tokenA: string, tokenB: string): Promise<DragonSwapPoolInfo | null> {
@@ -79,7 +97,7 @@ class DragonSwapAPI {
     }
   }
 
-  async executeSwap(params: DragonSwapTradeParams): Promise<string | null> {
+  async executeSwap(params: DragonSwapTradeParams, quote?: any): Promise<string | null> {
     try {
       elizaLogger.log(`Executing swap: ${params.amountIn} ${params.tokenIn} -> ${params.tokenOut}`);
 
@@ -89,35 +107,44 @@ class DragonSwapAPI {
         throw new Error("Wallet not connected");
       }
 
-      // Get quote first
-      const quote = await this.getQuote(params.tokenIn, params.tokenOut, params.amountIn);
-      if (!quote) {
-        throw new Error("Could not get swap quote");
+      // Use provided quote or get a new one
+      let swapQuote = quote;
+      if (!swapQuote) {
+        swapQuote = await this.getQuote(params.tokenIn, params.tokenOut, params.amountIn);
+        if (!swapQuote) {
+          throw new Error("Could not get swap quote");
+        }
       }
 
       // Validate quote
-      if (parseFloat(quote.amountOut) <= 0) {
+      if (parseFloat(swapQuote.amountOut) <= 0) {
         throw new Error("Invalid quote amount");
       }
 
       // Check slippage
       const slippageMultiplier = 1 - (params.slippage || 100) / 10000;
-      const minAmountOut = (parseFloat(quote.amountOut) * slippageMultiplier).toString();
+      const minAmountOut = (parseFloat(swapQuote.amountOut) * slippageMultiplier).toString();
 
       // Approve token if it's not native SEI
       if (params.tokenIn !== "SEI" && !this.isNativeToken(params.tokenIn)) {
         elizaLogger.log(`Approving token ${params.tokenIn} for swap`);
-        await this.approveToken(params.tokenIn, params.amountIn);
+        const tokenAddress = this.getTokenAddress(params.tokenIn);
+        await this.approveToken(tokenAddress, params.amountIn);
       }
 
       // Prepare transaction parameters
+      const calldata = this.buildSwapCalldata({
+        ...params,
+        minAmountOut
+      }) as `0x${string}`;
+
+      // Convert amounts to Wei (18 decimals)
+      const amountInWei = BigInt(Math.floor(parseFloat(params.amountIn) * 1e18));
+      
       const transactionRequest = {
         to: this.routerAddress,
-        data: this.buildSwapCalldata({
-          ...params,
-          minAmountOut
-        }) as `0x${string}`,
-        value: BigInt(params.tokenIn === "SEI" ? params.amountIn : "0")
+        data: calldata,
+        value: params.tokenIn === "SEI" ? amountInWei : BigInt(0)
       };
 
       // Execute transaction
@@ -134,63 +161,64 @@ class DragonSwapAPI {
     }
   }
 
-  private buildSwapCalldata(params: DragonSwapTradeParams & { minAmountOut: string }): string {
-    const swapRouterAbi = [
-      {
-        name: 'swapExactTokensForTokens',
-        type: 'function',
-        inputs: [
-          { name: 'amountIn', type: 'uint256' },
-          { name: 'amountOutMin', type: 'uint256' },
-          { name: 'path', type: 'address[]' },
-          { name: 'to', type: 'address' },
-          { name: 'deadline', type: 'uint256' }
-        ]
-      },
-      {
-        name: 'swapExactETHForTokens',
-        type: 'function',
-        inputs: [
-          { name: 'amountOutMin', type: 'uint256' },
-          { name: 'path', type: 'address[]' },
-          { name: 'to', type: 'address' },
-          { name: 'deadline', type: 'uint256' }
-        ]
-      }
-    ] as const;
+  private getTokenAddress(symbol: string): `0x${string}` {
+    const tokenAddresses: Record<string, string> = {
+      'USDC': '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      'USDT': '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+      'ETH': '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
+      'WSEI': '0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7' as `0x${string}`
+    };
+    
+    if (!tokenAddresses[symbol]) {
+      throw new Error(`Unsupported token: ${symbol}`);
+    }
+    
+    return getAddress(tokenAddresses[symbol]) as `0x${string}`;
+  }
 
+  private buildSwapCalldata(params: DragonSwapTradeParams & { minAmountOut: string }): string {
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 minutes
-    const walletAddress = this.walletProvider.getEvmWalletClient().account!.address;
+    const walletAddress = getAddress(this.walletProvider.getEvmWalletClient().account!.address);
 
     // Define WSEI address for SEI network
-    const WSEI_ADDRESS = "0x..."; // Replace with actual wrapped SEI address
+    const WSEI_ADDRESS = getAddress("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"); // Mock wrapped SEI address
 
     try {
+      // Convert amounts to Wei (18 decimals)
+      const amountInWei = BigInt(Math.floor(parseFloat(params.amountIn) * 1e18));
+      const minAmountOutWei = BigInt(Math.floor(parseFloat(params.minAmountOut) * 1e18));
+
       if (params.tokenIn === "SEI") {
         // Native SEI to token swap
+        const tokenOutAddress = this.getTokenAddress(params.tokenOut);
+        
         return encodeFunctionData({
           abi: swapRouterAbi,
-          functionName: 'swapExactETHForTokens',
+          functionName: 'exactInputSingle',
           args: [
-            BigInt(params.minAmountOut),
-            [WSEI_ADDRESS as `0x${string}`, params.tokenOut as `0x${string}`], // Use WSEI in path
+            WSEI_ADDRESS as `0x${string}`, // tokenIn (WSEI for native SEI)
+            tokenOutAddress, // tokenOut
+            amountInWei,
+            minAmountOutWei,
             walletAddress,
             deadline
           ]
         });
       } else {
         // Token to token swap (or token to SEI)
-        const path = params.tokenOut === "SEI" 
-          ? [params.tokenIn as `0x${string}`, WSEI_ADDRESS as `0x${string}`]
-          : [params.tokenIn as `0x${string}`, params.tokenOut as `0x${string}`];
+        const tokenInAddress = this.getTokenAddress(params.tokenIn);
+        const tokenOutAddress = params.tokenOut === "SEI" 
+          ? WSEI_ADDRESS as `0x${string}`
+          : this.getTokenAddress(params.tokenOut);
           
         return encodeFunctionData({
           abi: swapRouterAbi,
-          functionName: 'swapExactTokensForTokens',
+          functionName: 'exactInputSingle',
           args: [
-            BigInt(params.amountIn),
-            BigInt(params.minAmountOut),
-            path,
+            tokenInAddress,
+            tokenOutAddress,
+            amountInWei,
+            minAmountOutWei,
             walletAddress,
             deadline
           ]
@@ -213,11 +241,14 @@ class DragonSwapAPI {
       return;
     }
     
+    // Convert amount to Wei
+    const amountWei = BigInt(Math.floor(parseFloat(amount) * 1e18));
+    
     // Encode the approve function call
     const data = encodeFunctionData({
       abi: erc20Abi,
       functionName: 'approve',
-      args: [this.routerAddress, BigInt(amount)]
+      args: [this.routerAddress, amountWei]
     });
     
     // Send transaction using sendTransaction
@@ -341,17 +372,43 @@ export const dragonSwapTradeAction: Action = {
         return;
       }
 
+      // Check wallet balance before executing swap
+      const balance = await walletProvider.getWalletBalance();
+      const requiredAmount = parseFloat(tradeParams.amountIn);
+      const availableBalance = parseFloat(balance);
+      
+      if (availableBalance < requiredAmount) {
+        callback({
+          text: `Failed to execute swap: Insufficient balance. Required: ${requiredAmount} ${tradeParams.tokenIn}, Available: ${availableBalance} ${tradeParams.tokenIn}`,
+          error: true
+        });
+        return;
+      }
+
+      // Check for high price impact and warn user
+      const priceImpactPercent = quote.priceImpact * 100; // Convert to percentage
+      if (priceImpactPercent > 10.0) {
+        callback({
+          text: `⚠️ High Price Impact Warning: ${priceImpactPercent.toFixed(2)}%\nThis trade will significantly impact the token price. Consider reducing the trade size.`,
+        });
+      } else if (priceImpactPercent > 5.0) {
+        callback({
+          text: `Price Impact: ${priceImpactPercent.toFixed(2)}% - Moderate impact detected.`,
+        });
+      }
+
       // Execute the swap
       const txHash = await dragonSwap.executeSwap({
         ...tradeParams,
         minAmountOut: quote.amountOut
-      });
+      }, quote);
 
       if (txHash) {
+        const priceImpactPercent = quote.priceImpact * 100;
         callback({
           text: `✅ Successfully swapped ${tradeParams.amountIn} ${tradeParams.tokenIn} for ~${quote.amountOut} ${tradeParams.tokenOut}\n` +
                 `Transaction: ${txHash}\n` +
-                `Price Impact: ${quote.priceImpact.toFixed(2)}%`,
+                `Price Impact: ${priceImpactPercent.toFixed(2)}%`,
         });
       } else {
         callback({

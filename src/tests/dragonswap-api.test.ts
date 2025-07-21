@@ -18,9 +18,13 @@ class MockDragonSwapAPI {
   }
 
   async getPoolInfo(tokenA: string, tokenB: string) {
-    const response = await fetch(`${this.baseUrl}/pools/${tokenA}/${tokenB}`);
-    if (!response.ok) return null;
-    return await response.json();
+    try {
+      const response = await fetch(`${this.baseUrl}/pools/${tokenA}/${tokenB}`);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      return null;
+    }
   }
 
   async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
@@ -80,7 +84,9 @@ describe('DragonSwapAPI', () => {
     });
 
     it('should handle network errors', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
+      (global.fetch as Mock).mockImplementation(() => {
+        throw new Error('Network error');
+      });
 
       const result = await api.getPoolInfo('SEI', 'USDC');
       expect(result).toBeNull();

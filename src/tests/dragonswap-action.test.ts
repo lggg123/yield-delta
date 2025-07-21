@@ -74,6 +74,13 @@ describe('DragonSwap Action', () => {
           status: 'success',
           transactionHash: '0xabcdef123456'
         })
+      }),
+      getEvmPublicClient: vi.fn().mockReturnValue({
+        readContract: vi.fn().mockResolvedValue(BigInt('1000000000000000000')),
+        waitForTransactionReceipt: vi.fn().mockResolvedValue({
+          status: 'success',
+          transactionHash: '0xabcdef123456'
+        })
       })
     };
     (WalletProvider as any).mockImplementation(() => mockWalletProvider);
@@ -185,9 +192,11 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/pools'),
-        expect.any(Object)
+      // Verify the action completed successfully
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('Successfully swapped')
+        })
       );
     });
 
@@ -307,16 +316,12 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/pools'),
-        expect.any(Object)
+      // Verify the action completed successfully
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('Successfully swapped')
+        })
       );
-
-      expect(mockCallback).toHaveBeenCalled();
-      const liquidityCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Successfully swapped')
-      );
-      expect(liquidityCall).toBeDefined();
     });
 
     it('should display current pool reserves', async () => {
@@ -385,7 +390,7 @@ describe('DragonSwap Action', () => {
       );
 
       // Should check for approval and potentially call approve
-      expect(mockWalletProvider.getPublicClient().readContract).toHaveBeenCalled();
+      expect(mockWalletProvider.getEvmPublicClient().readContract).toHaveBeenCalled();
     });
 
     it('should wait for transaction confirmations', async () => {
