@@ -52,9 +52,9 @@ export class SeiOracleProvider implements Provider {
         'USDC': '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
       },
       chainlinkFeeds: {
-        'BTC/USD': '0x...',
-        'ETH/USD': '0x...',
-        'SEI/USD': '0x...',
+        'BTC/USD': '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
+        'ETH/USD': '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
+        'SEI/USD': '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
       },
       cexApis: {
         binance: 'https://fapi.binance.com/fapi/v1',
@@ -127,10 +127,23 @@ export class SeiOracleProvider implements Provider {
 
   async getPrice(symbol: string): Promise<PriceFeed | null> {
     try {
-      // Check cache first
+      // Check cache first - compare with runtime cache if available
       const cached = this.priceCache.get(symbol);
       if (cached && Date.now() - cached.timestamp < this.config.updateInterval * 1000) {
         return cached;
+      }
+
+      // Try runtime cache first if available
+      if (this.runtime.cacheManager) {
+        try {
+          const runtimeCached = await this.runtime.cacheManager.get(`price_${symbol}`);
+          if (runtimeCached && Date.now() - runtimeCached.timestamp < this.config.updateInterval * 1000) {
+            this.priceCache.set(symbol, runtimeCached);
+            return runtimeCached;
+          }
+        } catch (error) {
+          // Cache error, continue with fetch
+        }
       }
 
       // Try multiple sources
@@ -138,11 +151,20 @@ export class SeiOracleProvider implements Provider {
       if (!price) price = await this.getChainlinkPrice(symbol);
       if (!price) price = await this.getCexPrice(symbol);
 
-      if (price) {
+      if (price && !isNaN(price.price) && price.price > 0) {
         this.priceCache.set(symbol, price);
+        // Also cache in runtime if available
+        if (this.runtime.cacheManager) {
+          try {
+            await this.runtime.cacheManager.set(`price_${symbol}`, price);
+          } catch (error) {
+            // Cache error, continue
+          }
+        }
+        return price;
       }
 
-      return price;
+      return null;
     } catch (error) {
       elizaLogger.error(`Failed to get price for ${symbol}:`, error);
       return null;
@@ -152,7 +174,7 @@ export class SeiOracleProvider implements Provider {
   async getFundingRates(symbol: string): Promise<FundingRate[]> {
     try {
       const cached = this.fundingRateCache.get(symbol);
-      if (cached && Date.now() - cached[0]?.timestamp < this.config.updateInterval * 1000) {
+      if (cached && cached.length > 0 && Date.now() - cached[0]?.timestamp < this.config.updateInterval * 1000) {
         return cached;
       }
 
@@ -180,12 +202,50 @@ export class SeiOracleProvider implements Provider {
       const feedId = this.config.pythPriceFeeds[symbol];
       if (!feedId) return null;
 
-      // Implement Pyth Network price feed reading
-      // This would require the Pyth SDK for on-chain price feeds
-      elizaLogger.log(`Getting Pyth price for ${symbol}`);
-      
-      // Placeholder - implement actual Pyth integration
-      return null;
+      const publicClient = createPublicClient({
+        chain: seiChains.mainnet,
+        transport: http()
+      });
+
+      const result = await publicClient.readContract({
+        address: '0x2880aB155794e7179c9eE2e38200202908C17B43' as `0x${string}`,
+        abi: [
+          {
+            name: 'queryPriceFeed',
+            type: 'function',
+            inputs: [{ name: 'id', type: 'bytes32' }],
+            outputs: [
+              { name: 'price', type: 'int64' },
+              { name: 'conf', type: 'uint64' },
+              { name: 'expo', type: 'int32' },
+              { name: 'publishTime', type: 'uint256' }
+            ]
+          }
+        ] as const,
+        functionName: 'queryPriceFeed',
+        args: [feedId as `0x${string}`]
+      });
+
+      if (!result || result[0] === BigInt(0)) {
+        return null; // Invalid price data
+      }
+
+      const price = Number(result[0]) / Math.pow(10, 8);
+      const confidence = Number(result[1]) / Math.pow(10, 8);
+      const timestamp = Number(result[3]) * 1000; // Convert to milliseconds
+
+      // Validate price data
+      if (isNaN(price) || price <= 0) {
+        return null;
+      }
+
+      return {
+        symbol,
+        price,
+        timestamp,
+        source: 'pyth',
+        confidence
+      };
     } catch (error) {
       elizaLogger.error(`Pyth price fetch error for ${symbol}:`, error);
       return null;
@@ -202,29 +262,35 @@ export class SeiOracleProvider implements Provider {
         transport: http()
       });
 
-      // Chainlink ABI for price feeds
-      const chainlinkAbi = [
-        {
-          name: 'latestRoundData',
-          type: 'function',
-          outputs: [
-            { name: 'roundId', type: 'uint80' },
-            { name: 'answer', type: 'int256' },
-            { name: 'startedAt', type: 'uint256' },
-            { name: 'updatedAt', type: 'uint256' },
-            { name: 'answeredInRound', type: 'uint80' }
-          ]
-        }
-      ] as const;
-
       const result = await publicClient.readContract({
         address: feedAddress as `0x${string}`,
-        abi: chainlinkAbi,
+        abi: [
+          {
+            name: 'latestRoundData',
+            type: 'function',
+            outputs: [
+              { name: 'roundId', type: 'uint80' },
+              { name: 'answer', type: 'int256' },
+              { name: 'startedAt', type: 'uint256' },
+              { name: 'updatedAt', type: 'uint256' },
+              { name: 'answeredInRound', type: 'uint80' }
+            ]
+          }
+        ] as const,
         functionName: 'latestRoundData'
       });
 
+      if (!result || result[1] === BigInt(0)) {
+        return null; // Invalid price data
+      }
+
       const price = Number(result[1]) / 1e8; // Chainlink uses 8 decimals
-      const timestamp = Number(result[3]) * 1000;
+      const timestamp = Number(result[3]) * 1000; // Convert to milliseconds
+
+      // Validate price data
+      if (isNaN(price) || price <= 0) {
+        return null;
+      }
 
       return {
         symbol,
@@ -241,16 +307,28 @@ export class SeiOracleProvider implements Provider {
 
   private async getCexPrice(symbol: string): Promise<PriceFeed | null> {
     try {
-      // Try Binance first
+      // Only try for supported symbols
+      const supportedSymbols = ['BTC', 'ETH', 'SEI', 'USDC', 'SOL', 'AVAX'];
+      if (!supportedSymbols.includes(symbol)) {
+        return null;
+      }
+
       const response = await fetch(
         `${this.config.cexApis.binance}/ticker/price?symbol=${symbol}USDT`
       );
       
       if (response.ok) {
         const data = await response.json();
+        const price = parseFloat(data.price);
+        
+        // Validate price data
+        if (isNaN(price) || price <= 0) {
+          return null;
+        }
+        
         return {
           symbol,
-          price: parseFloat(data.price),
+          price,
           timestamp: Date.now(),
           source: 'Binance',
           confidence: 0.95

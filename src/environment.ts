@@ -2,7 +2,7 @@ import type { IAgentRuntime } from "@elizaos/core";
 import { z } from "zod";
 
 export const seiEnvSchema = z.object({
-    SEI_PRIVATE_KEY: z.string().min(1, "Sui private key is required"),
+    SEI_PRIVATE_KEY: z.string().min(1, "Sei private key is required"), // Fixed: "Sui" -> "Sei"
     SEI_NETWORK: z.enum(["mainnet", "testnet", "devnet", "local"]),
 });
 

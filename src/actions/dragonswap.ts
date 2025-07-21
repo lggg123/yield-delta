@@ -9,7 +9,6 @@ import {
 import { validateSeiConfig } from "../environment";
 import { WalletProvider, seiChains } from "../providers/wallet";
 import { erc20Abi, encodeFunctionData } from 'viem';
-import type { SendTransactionParameters } from 'viem';
 
 export interface DragonSwapTradeParams {
   tokenIn: string;

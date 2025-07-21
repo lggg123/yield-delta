@@ -80,7 +80,7 @@ describe('DragonSwapAPI', () => {
     });
 
     it('should handle network errors', async () => {
-      (global.fetch as Mock).mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       const result = await api.getPoolInfo('SEI', 'USDC');
       expect(result).toBeNull();
