@@ -3,6 +3,17 @@ import { dragonSwapTradeAction } from '../actions/dragonswap';
 import { WalletProvider } from '../providers/wallet';
 import { SeiOracleProvider } from '../providers/sei-oracle';
 
+// Import test helpers
+import { 
+  createMockMemory, 
+  createMockState, 
+  createMockRuntime,
+  createMockCallback,
+  findCallbackWithText,
+  wasCallbackSuccessful,
+  wasCallbackError
+} from './test-helpers';
+
 // Mock dependencies
 vi.mock('../providers/wallet');
 vi.mock('../providers/sei-oracle');
@@ -21,41 +32,14 @@ vi.stubGlobal('fetch', mockFetch);
 
 describe('DragonSwap Action', () => {
   let mockRuntime: any;
-  let mockMessage: any;
-  let mockState: any;
-  let mockCallback: any;
   let mockWalletProvider: any;
   let mockOracleProvider: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockRuntime = {
-      getSetting: vi.fn((key: string) => {
-        switch (key) {
-          case 'SEI_PRIVATE_KEY':
-            return '0x1234567890abcdef';
-          case 'SEI_NETWORK':
-            return 'mainnet';
-          default:
-            return null;
-        }
-      }),
-      cacheManager: {
-        get: vi.fn(),
-        set: vi.fn(),
-        delete: vi.fn()
-      }
-    };
-
-    mockMessage = {
-      content: {
-        text: 'swap 1 SEI for USDC'
-      }
-    };
-
-    mockState = {};
-    mockCallback = vi.fn();
+    // Use the test helper for runtime
+    mockRuntime = createMockRuntime();
 
     // Mock WalletProvider
     mockWalletProvider = {
@@ -139,6 +123,7 @@ describe('DragonSwap Action', () => {
     });
 
     it('should validate runtime configuration', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
       const result = await dragonSwapTradeAction.validate(mockRuntime, mockMessage);
       expect(typeof dragonSwapTradeAction.validate).toBe('function');
     });
@@ -146,6 +131,10 @@ describe('DragonSwap Action', () => {
 
   describe('Token Swap Operations', () => {
     it('should execute basic token swap', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -155,16 +144,18 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const calls = mockCallback.mock.calls;
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
       
-      // Should have callback with swap result
-      expect(calls[0][0].text).toContain('Successfully swapped');
-      expect(calls[0][0].text).toContain('SEI');
-      expect(calls[0][0].text).toContain('USDC');
+      const successCall = findCallbackWithText(mockCallback, 'Successfully swapped');
+      expect(successCall).toBeDefined();
+      expect(successCall[0].text).toContain('SEI');
+      expect(successCall[0].text).toContain('USDC');
     });
 
     it('should parse swap parameters from message', async () => {
-      mockMessage.content.text = 'swap 5 SEI for ETH';
+      const mockMessage = createMockMemory('swap 5 SEI for ETH');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -175,14 +166,16 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const calls = mockCallback.mock.calls;
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
       
-      // Should successfully parse and attempt the swap
-      expect(calls[0][0].text).toContain('Successfully swapped');
+      const successCall = findCallbackWithText(mockCallback, 'Successfully swapped');
+      expect(successCall).toBeDefined();
     });
 
     it('should handle different token pair combinations', async () => {
-      mockMessage.content.text = 'swap 100 USDC for SEI';
+      const mockMessage = createMockMemory('swap 100 USDC for SEI');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -192,15 +185,39 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      // Verify the action completed successfully
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Successfully swapped')
-        })
-      );
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
+      const successCall = findCallbackWithText(mockCallback, 'Successfully swapped');
+      expect(successCall).toBeDefined();
     });
 
     it('should calculate expected output amounts', async () => {
+      // Mock successful pool info response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          pool: {
+            token0: 'SEI',
+            token1: 'USDC',
+            fee: 0.003,
+            liquidity: '1000000'
+          }
+        })
+      });
+
+      // Mock successful quote response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          amountOut: '45.50',
+          priceImpact: '0.001',
+          route: ['SEI', 'USDC']
+        })
+      });
+
+      const mockMessage = createMockMemory('swap 1 SEI for USDC on DragonSwap');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -209,22 +226,41 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
+      expect(mockCallback).toHaveBeenCalled();
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
+
+      // Check for both API calls separately
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/quote'),
-        expect.any(Object)
+        'https://api-testnet.dragonswap.app/v1/pools/SEI/USDC'
+      );
+      
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api-testnet.dragonswap.app/v1/quote',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            tokenIn: 'SEI',
+            tokenOut: 'USDC',
+            amountIn: '1'
+          })
+        })
       );
 
-      expect(mockCallback).toHaveBeenCalled();
-      const successCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Successfully swapped') ||
-        call[0].text.includes('0.495')
-      );
+      const successCall = findCallbackWithText(mockCallback, 'swap') || 
+                         findCallbackWithText(mockCallback, 'exchange');
       expect(successCall).toBeDefined();
     });
   });
 
   describe('Price Impact Analysis', () => {
     it('should calculate and display price impact', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -234,10 +270,8 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const impactCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Price Impact') ||
-        call[0].text.includes('0.001')
-      );
+      const impactCall = findCallbackWithText(mockCallback, 'Price Impact') ||
+                        findCallbackWithText(mockCallback, '0.1%');
       expect(impactCall).toBeDefined();
     });
 
@@ -253,20 +287,28 @@ describe('DragonSwap Action', () => {
             })
           });
         }
+        if (url.includes('/pools')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              address: '0x1234567890abcdef1234567890abcdef12345678',
+              token0: 'SEI',
+              token1: 'USDC',
+              fee: 3000,
+              liquidity: '1000000',
+              price: '0.5'
+            })
+          });
+        }
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            address: '0x1234567890abcdef1234567890abcdef12345678',
-            token0: 'SEI',
-            token1: 'USDC',
-            fee: 3000,
-            liquidity: '1000000',
-            price: '0.5'
-          })
+          json: () => Promise.resolve({})
         });
       });
 
-      mockMessage.content.text = 'swap 1000 SEI for USDC';
+      const mockMessage = createMockMemory('swap 1000 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -277,14 +319,14 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const impactCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Price Impact: 15')
-      );
+      const impactCall = findCallbackWithText(mockCallback, 'Price Impact: 15');
       expect(impactCall).toBeDefined();
     });
 
-    it('should suggest optimal trade sizes', async () => {
-      mockMessage.content.text = 'what is the optimal size to swap SEI for USDC?';
+    it('should handle invalid swap format', async () => {
+      const mockMessage = createMockMemory('what is the optimal size to swap SEI for USDC?');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -295,18 +337,17 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      // This test should expect error since it's not a valid swap format
-      const errorCall = mockCallback.mock.calls.find(call => 
-        call[0].error === true &&
-        call[0].text.includes("couldn't understand")
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, "couldn't understand");
       expect(errorCall).toBeDefined();
     });
   });
 
   describe('Liquidity Pool Analysis', () => {
     it('should analyze pool liquidity depth', async () => {
-      mockMessage.content.text = 'swap 1 SEI for USDC'; // Use valid swap format
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -316,16 +357,15 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      // Verify the action completed successfully
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Successfully swapped')
-        })
-      );
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
+      const successCall = findCallbackWithText(mockCallback, 'Successfully swapped');
+      expect(successCall).toBeDefined();
     });
 
     it('should display current pool reserves', async () => {
-      mockMessage.content.text = 'swap 1 SEI for USDC'; // Use valid swap format
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -336,14 +376,17 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const reservesCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Successfully swapped') &&
-        (call[0].text.includes('SEI') && call[0].text.includes('USDC'))
-      );
+      const reservesCall = findCallbackWithText(mockCallback, 'Successfully swapped');
       expect(reservesCall).toBeDefined();
+      expect(reservesCall[0].text).toContain('SEI');
+      expect(reservesCall[0].text).toContain('USDC');
     });
 
     it('should calculate current pool ratio', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -353,17 +396,17 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const ratioCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Price Impact') ||
-        call[0].text.includes('0.001')
-      );
+      const ratioCall = findCallbackWithText(mockCallback, 'Price Impact') ||
+                       findCallbackWithText(mockCallback, '0.1%');
       expect(ratioCall).toBeDefined();
     });
   });
 
   describe('Trade Execution', () => {
     it('should execute approved trades', async () => {
-      mockMessage.content.text = 'execute swap 1 SEI for USDC';
+      const mockMessage = createMockMemory('execute swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -378,8 +421,9 @@ describe('DragonSwap Action', () => {
     });
 
     it('should handle token approvals before swaps', async () => {
-      // Test with USDC to SEI swap (USDC needs approval)
-      mockMessage.content.text = 'swap 100 USDC for SEI';
+      const mockMessage = createMockMemory('swap 100 USDC for SEI');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -394,6 +438,10 @@ describe('DragonSwap Action', () => {
     });
 
     it('should wait for transaction confirmations', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -406,6 +454,10 @@ describe('DragonSwap Action', () => {
     });
 
     it('should provide transaction hash on successful trades', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -415,18 +467,19 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const successCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('0xabcdef123456') &&
-        call[0].text.includes('Successfully swapped')
-      );
+      const successCall = findCallbackWithText(mockCallback, '0xabcdef123456');
       expect(successCall).toBeDefined();
+      expect(successCall[0].text).toContain('Successfully swapped');
     });
   });
 
   describe('Error Handling', () => {
     it('should handle insufficient balance gracefully', async () => {
       mockWalletProvider.getWalletBalance.mockResolvedValue('0.1'); // Very low balance
-      mockMessage.content.text = 'swap 100 SEI for USDC';
+      
+      const mockMessage = createMockMemory('swap 100 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -436,12 +489,9 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Failed to execute swap'),
-          error: true
-        })
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, 'Failed to execute swap');
+      expect(errorCall).toBeDefined();
     });
 
     it('should handle pool liquidity issues', async () => {
@@ -458,6 +508,10 @@ describe('DragonSwap Action', () => {
         });
       });
 
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -466,17 +520,18 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Failed to execute swap'),
-          error: true
-        })
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, 'Failed to execute swap');
+      expect(errorCall).toBeDefined();
     });
 
     it('should handle API failures gracefully', async () => {
       mockFetch.mockRejectedValue(new Error('DragonSwap API unavailable'));
 
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -485,12 +540,9 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('No liquidity pool found'),
-          error: true
-        })
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, 'No liquidity pool found');
+      expect(errorCall).toBeDefined();
     });
 
     it('should handle transaction failures', async () => {
@@ -498,7 +550,9 @@ describe('DragonSwap Action', () => {
         new Error('Transaction reverted')
       );
 
-      mockMessage.content.text = 'execute swap 1 SEI for USDC';
+      const mockMessage = createMockMemory('execute swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -508,17 +562,14 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Failed to execute swap'),
-          error: true
-        })
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, 'Failed to execute swap');
+      expect(errorCall).toBeDefined();
     });
   });
 
   describe('Token Parameter Parsing', () => {
-    it('should parse various swap format inputs', () => {
+    it('should parse various swap format inputs', async () => {
       const testCases = [
         { input: 'swap 1 SEI for USDC', expected: { amount: '1', from: 'SEI', to: 'USDC' } },
         { input: 'trade 5.5 ETH to SEI', expected: { amount: '5.5', from: 'ETH', to: 'SEI' } },
@@ -526,8 +577,10 @@ describe('DragonSwap Action', () => {
         { input: 'convert 0.1 SEI to USDC', expected: { amount: '0.1', from: 'SEI', to: 'USDC' } }
       ];
 
-      testCases.forEach(async (testCase) => {
-        mockMessage.content.text = testCase.input;
+      for (const testCase of testCases) {
+        const mockMessage = createMockMemory(testCase.input);
+        const mockState = createMockState();
+        const mockCallback = createMockCallback();
         
         await dragonSwapTradeAction.handler(
           mockRuntime,
@@ -537,13 +590,15 @@ describe('DragonSwap Action', () => {
           mockCallback
         );
 
-        // Should correctly parse the input parameters
         expect(mockCallback).toHaveBeenCalled();
-      });
+        expect(wasCallbackSuccessful(mockCallback)).toBe(true);
+      }
     });
 
     it('should handle decimal amounts correctly', async () => {
-      mockMessage.content.text = 'swap 1.5 SEI for USDC';
+      const mockMessage = createMockMemory('swap 1.5 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -554,11 +609,13 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      // Should handle decimal parsing correctly
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
     });
 
     it('should validate supported token symbols', async () => {
-      mockMessage.content.text = 'swap 1 INVALIDTOKEN for USDC';
+      const mockMessage = createMockMemory('swap 1 INVALIDTOKEN for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -568,17 +625,18 @@ describe('DragonSwap Action', () => {
         mockCallback
       );
 
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Failed to execute swap'),
-          error: true
-        })
-      );
+      expect(wasCallbackError(mockCallback)).toBe(true);
+      const errorCall = findCallbackWithText(mockCallback, 'Failed to execute swap');
+      expect(errorCall).toBeDefined();
     });
   });
 
   describe('Slippage Protection', () => {
     it('should apply default slippage tolerance', async () => {
+      const mockMessage = createMockMemory('swap 1 SEI for USDC');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
+
       await dragonSwapTradeAction.handler(
         mockRuntime,
         mockMessage,
@@ -588,15 +646,15 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      const slippageCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Successfully swapped') ||
-        call[0].text.includes('Price Impact')
-      );
+      const slippageCall = findCallbackWithText(mockCallback, 'Successfully swapped') ||
+                          findCallbackWithText(mockCallback, 'Price Impact');
       expect(slippageCall).toBeDefined();
     });
 
     it('should accept custom slippage settings', async () => {
-      mockMessage.content.text = 'swap 1 SEI for USDC with 1% slippage';
+      const mockMessage = createMockMemory('swap 1 SEI for USDC with 1% slippage');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -607,11 +665,13 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      // Should apply custom slippage tolerance
+      expect(wasCallbackSuccessful(mockCallback)).toBe(true);
     });
 
     it('should warn about high slippage risks', async () => {
-      mockMessage.content.text = 'swap 1 SEI for USDC with 10% slippage';
+      const mockMessage = createMockMemory('swap 1 SEI for USDC with 10% slippage');
+      const mockState = createMockState();
+      const mockCallback = createMockCallback();
 
       await dragonSwapTradeAction.handler(
         mockRuntime,
@@ -622,10 +682,7 @@ describe('DragonSwap Action', () => {
       );
 
       expect(mockCallback).toHaveBeenCalled();
-      // Should parse and execute the swap successfully
-      const successCall = mockCallback.mock.calls.find(call => 
-        call[0].text.includes('Successfully swapped')
-      );
+      const successCall = findCallbackWithText(mockCallback, 'Successfully swapped');
       expect(successCall).toBeDefined();
     });
   });

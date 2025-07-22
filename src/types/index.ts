@@ -73,3 +73,95 @@ export interface ProviderError extends Error {
     code?: number;
     data?: unknown;
 }
+
+export interface DragonSwapTradeParams {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  minAmountOut: string;
+  slippage?: number; // in basis points (100 = 1%)
+}
+
+export interface DragonSwapPoolInfo {
+  address: string;
+  token0: string;
+  token1: string;
+  fee: number;
+  liquidity: string;
+  price: string;
+}
+
+export interface ArbitrageOpportunity {
+  symbol: string;
+  cexFundingRate: number;
+  targetExchange: string;
+  expectedReturn: number;
+  risk: 'low' | 'medium' | 'high';
+  requiredCapital: number;
+  hedgeAction: 'short_dex' | 'long_dex';
+  confidence: number;
+}
+
+export interface ArbitragePosition {
+  id: string;
+  symbol: string;
+  cexSide: 'long' | 'short';
+  dexSide: 'long' | 'short';
+  size: number;
+  entryTime: number;
+  expectedReturn: number;
+  status: 'active' | 'closing' | 'closed';
+  cexFundingCollected: number;
+  netPnl: number;
+}
+
+export interface PriceFeed {
+  symbol: string;
+  price: number;
+  timestamp: number;
+  source: string;
+  confidence: number;
+}
+
+export interface FundingRate {
+  symbol: string;
+  rate: number;
+  timestamp: number;
+  exchange: string;
+  nextFundingTime: number;
+}
+
+export interface PortfolioAsset {
+  symbol: string;
+  balance: number;
+  value: number;
+  currentPercentage: number;
+  targetPercentage: number;
+  deviation: number;
+  recommended: 'buy' | 'sell' | 'hold';
+  amount?: number;
+}
+
+export interface RebalanceStrategy {
+  name: string;
+  description: string;
+  riskLevel: 'conservative' | 'balanced' | 'aggressive';
+  allocations: Record<string, number>;
+  rebalanceThreshold: number;
+}
+
+export interface PortfolioAnalysis {
+  totalValue: number;
+  assets: PortfolioAsset[];
+  strategy: RebalanceStrategy;
+  rebalanceNeeded: boolean;
+  recommendations: RebalanceRecommendation[];
+}
+
+export interface RebalanceRecommendation {
+  asset: string;
+  action: 'buy' | 'sell';
+  amount: number;
+  priority: 'high' | 'medium' | 'low';
+  reason: string;
+}

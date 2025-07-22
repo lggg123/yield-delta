@@ -80,6 +80,10 @@ describe('Perps Trading Action', () => {
     });
 
     it('should handle validation errors gracefully', async () => {
+      // Temporarily override NODE_ENV to trigger validation error
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
       // Remove required environment
       mockRuntime.getSetting = vi.fn(() => null);
       delete process.env.SEI_PRIVATE_KEY;
@@ -92,6 +96,9 @@ describe('Perps Trading Action', () => {
         {},
         mockCallback
       );
+
+      // Restore NODE_ENV
+      process.env.NODE_ENV = originalNodeEnv;
 
       // Should still call callback with error
       expect(mockCallback).toHaveBeenCalled();

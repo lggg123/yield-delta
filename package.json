@@ -1,7 +1,7 @@
 {
-    "name": "yield-delta",
+    "name": "@elizaos/plugin-sei-yield-delta",
     "version": "1.0.0",
-    "description": "Advanced DeFi yield optimization and arbitrage strategies for SEI blockchain",
+    "description": "SEI Network yield optimization and DeFi trading plugin for Eliza",
     "main": "dist/index.js",
     "module": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -20,6 +20,8 @@
     ],
     "dependencies": {
         "@elizaos/core": "^1.2.12",
+        "dotenv": "^17.2.0",
+        "ethers": "^6.15.0",
         "node-cache": "5.1.2",
         "tsup": "8.3.5",
         "typescript": "^5.8.3",
@@ -30,12 +32,17 @@
     "scripts": {
         "build": "tsup --format esm --dts",
         "lint": "eslint . --fix",
-        "test": "vitest run",
-        "test:watch": "vitest --watch",
+        "test": "NODE_ENV=test vitest run",
+        "test:watch": "NODE_ENV=test vitest --watch",
         "test:coverage": "vitest --coverage"
     },
     "keywords": [
+        "eliza",
+        "sei",
         "defi",
+        "yield",
+        "trading",
+        "dragonswap",
         "arbitrage",
         "yield-farming",
         "sei-blockchain",

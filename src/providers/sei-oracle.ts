@@ -71,6 +71,11 @@ export class SeiOracleProvider implements Provider {
     state?: State
   ): Promise<string | null> {
     try {
+      // If no message content, return provider description
+      if (!message?.content?.text) {
+        return "SEI Oracle Provider: Real-time price data and funding rates for assets on the SEI blockchain using Pyth, Chainlink, and CEX APIs.";
+      }
+      
       const text = message.content.text.toLowerCase();
       
       if (text.includes('price') || text.includes('quote')) {
@@ -173,6 +178,19 @@ export class SeiOracleProvider implements Provider {
 
   async getFundingRates(symbol: string): Promise<FundingRate[]> {
     try {
+      // Check runtime cache first
+      if (this.runtime.cacheManager) {
+        try {
+          const runtimeCached = await this.runtime.cacheManager.get(`funding_rates_${symbol}`);
+          if (runtimeCached && Array.isArray(runtimeCached) && runtimeCached.length > 0) {
+            return runtimeCached;
+          }
+        } catch (cacheError) {
+          elizaLogger.warn("Cache retrieval failed for funding rates:", cacheError);
+        }
+      }
+
+      // Check internal cache as fallback
       const cached = this.fundingRateCache.get(symbol);
       if (cached && cached.length > 0 && Date.now() - cached[0]?.timestamp < this.config.updateInterval * 1000) {
         return cached;
@@ -188,6 +206,15 @@ export class SeiOracleProvider implements Provider {
       
       if (validRates.length > 0) {
         this.fundingRateCache.set(symbol, validRates);
+        
+        // Cache in runtime cache manager as well
+        if (this.runtime.cacheManager) {
+          try {
+            await this.runtime.cacheManager.set(`funding_rates_${symbol}`, validRates);
+          } catch (cacheError) {
+            elizaLogger.warn("Cache storage failed for funding rates:", cacheError);
+          }
+        }
       }
 
       return validRates;

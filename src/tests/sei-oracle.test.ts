@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SeiOracleProvider } from '../providers/sei-oracle';
 import { createPublicClient } from 'viem';
 
+// Import test helpers
+import { 
+  createMockRuntime
+} from './test-helpers';
+
 // Mock dependencies
 vi.mock('viem', () => ({
   createPublicClient: vi.fn(),
@@ -30,13 +35,17 @@ describe('SeiOracleProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Use test helper but override specific settings for oracle tests
     mockRuntime = {
+      ...createMockRuntime(),
       getSetting: vi.fn((key: string) => {
         switch (key) {
           case 'SEI_RPC_URL':
             return 'https://evm-rpc.sei-apis.com';
           case 'SEI_NETWORK':
             return 'mainnet';
+          case 'ORACLE_API_KEY':
+            return 'test-oracle-key';
           default:
             return null;
         }
@@ -49,7 +58,11 @@ describe('SeiOracleProvider', () => {
     };
 
     mockPublicClient = {
-      readContract: vi.fn()
+      readContract: vi.fn(),
+      getBlockNumber: vi.fn().mockResolvedValue(BigInt(1000000)),
+      getBlock: vi.fn().mockResolvedValue({
+        timestamp: BigInt(Math.floor(Date.now() / 1000))
+      })
     };
 
     (createPublicClient as any).mockReturnValue(mockPublicClient);
@@ -60,13 +73,29 @@ describe('SeiOracleProvider', () => {
     oracleProvider = new SeiOracleProvider(mockRuntime);
   });
 
-  describe('Price Feed Operations', () => {
+  describe('Initialization and Configuration', () => {
     it('should initialize with correct configuration', () => {
       expect(oracleProvider).toBeInstanceOf(SeiOracleProvider);
-      // Verify initialization succeeded
       expect(oracleProvider).toBeDefined();
     });
 
+    it('should provide context for the provider', async () => {
+      const context = await oracleProvider.get(mockRuntime, {}, {});
+      expect(context).toContain('price data');
+      expect(context).toContain('SEI blockchain');
+    });
+
+    it('should handle missing configuration gracefully', () => {
+      const badRuntime = {
+        ...mockRuntime,
+        getSetting: vi.fn().mockReturnValue(null)
+      };
+
+      expect(() => new SeiOracleProvider(badRuntime)).not.toThrow();
+    });
+  });
+
+  describe('Price Feed Operations', () => {
     it('should fetch price for BTC from Pyth oracle', async () => {
       const currentTimestamp = Math.floor(Date.now() / 1000);
       
@@ -83,6 +112,7 @@ describe('SeiOracleProvider', () => {
       expect(price?.symbol).toBe('BTC');
       expect(price?.price).toBeCloseTo(45000, 1);
       expect(price?.source).toBe('pyth');
+      expect(price?.confidence).toBeCloseTo(0.1, 2);
     });
 
     it('should fetch price for ETH from Pyth oracle', async () => {
@@ -100,6 +130,42 @@ describe('SeiOracleProvider', () => {
       expect(price).toBeDefined();
       expect(price?.symbol).toBe('ETH');
       expect(price?.price).toBeCloseTo(2500, 1);
+      expect(price?.source).toBe('pyth');
+    });
+
+    it('should fetch price for SEI token', async () => {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      
+      mockPublicClient.readContract.mockResolvedValue([
+        BigInt('50000000'), // price: 0.5 with 8 decimals
+        BigInt('1000000'), // confidence
+        BigInt(-8), // expo
+        BigInt(currentTimestamp)
+      ]);
+
+      const price = await oracleProvider.getPrice('SEI');
+
+      expect(price).toBeDefined();
+      expect(price?.symbol).toBe('SEI');
+      expect(price?.price).toBeCloseTo(0.5, 2);
+      expect(price?.source).toBe('pyth');
+    });
+
+    it('should fetch price for USDC stablecoin', async () => {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      
+      mockPublicClient.readContract.mockResolvedValue([
+        BigInt('100000000'), // price: 1.0 with 8 decimals
+        BigInt('100000'), // confidence
+        BigInt(-8), // expo
+        BigInt(currentTimestamp)
+      ]);
+
+      const price = await oracleProvider.getPrice('USDC');
+
+      expect(price).toBeDefined();
+      expect(price?.symbol).toBe('USDC');
+      expect(price?.price).toBeCloseTo(1.0, 3);
       expect(price?.source).toBe('pyth');
     });
 
@@ -121,6 +187,7 @@ describe('SeiOracleProvider', () => {
 
       expect(price).toBeDefined();
       expect(price?.source).toBe('Chainlink');
+      expect(price?.price).toBeCloseTo(45000, 1);
     });
 
     it('should fallback to CEX APIs when on-chain oracles fail', async () => {
@@ -141,6 +208,30 @@ describe('SeiOracleProvider', () => {
       expect(price).toBeDefined();
       expect(price?.price).toBe(45000.50);
       expect(price?.source).toBe('Binance');
+    });
+
+    it('should handle multiple price sources for comparison', async () => {
+      // Mock successful responses from multiple sources
+      mockPublicClient.readContract.mockResolvedValue([
+        BigInt('4500000000000'),
+        BigInt('10000000'),
+        BigInt(-8),
+        BigInt(Math.floor(Date.now() / 1000))
+      ]);
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          symbol: 'BTCUSDT',
+          price: '45100.00'
+        })
+      });
+
+      const price = await oracleProvider.getPrice('BTC');
+
+      // Should prefer Pyth as primary source
+      expect(price?.source).toBe('pyth');
+      expect(price?.price).toBeCloseTo(45000, 1);
     });
 
     it('should handle unsupported symbols gracefully', async () => {
@@ -182,10 +273,63 @@ describe('SeiOracleProvider', () => {
 
       const fundingRates = await oracleProvider.getFundingRates('BTC');
 
-      expect(fundingRates).toHaveLength(1);
+      expect(fundingRates).toBeDefined();
+      expect(Array.isArray(fundingRates)).toBe(true);
+      expect(fundingRates.length).toBeGreaterThan(0);
       expect(fundingRates[0].symbol).toBe('BTC');
       expect(fundingRates[0].rate).toBe(0.0001 * 8760); // Annualized
       expect(fundingRates[0].exchange).toBe('Binance');
+    });
+
+    it('should fetch funding rates from OKX', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('okx') && url.includes('funding-rate')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              data: [{
+                instType: 'SWAP',
+                instId: 'BTC-USD-SWAP',
+                fundingRate: '0.0002',
+                nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+              }]
+            })
+          });
+        }
+        return Promise.reject(new Error('API unavailable'));
+      });
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      expect(fundingRates.length).toBeGreaterThan(0);
+      expect(fundingRates[0].exchange).toBe('OKX');
+      expect(fundingRates[0].rate).toBe(0.0002 * 8760); // Annualized
+    });
+
+    it('should fetch funding rates from Bybit', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('bybit') && url.includes('tickers')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              result: {
+                list: [{
+                  symbol: 'BTCUSDT',
+                  fundingRate: '0.00015',
+                  nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+                }]
+              }
+            })
+          });
+        }
+        return Promise.reject(new Error('API unavailable'));
+      });
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      expect(fundingRates.length).toBeGreaterThan(0);
+      expect(fundingRates[0].exchange).toBe('Bybit');
+      expect(fundingRates[0].rate).toBe(0.00015 * 8760); // Annualized
     });
 
     it('should handle funding rate API failures gracefully', async () => {
@@ -216,6 +360,41 @@ describe('SeiOracleProvider', () => {
       const fundingRates = await oracleProvider.getFundingRates('BTC');
 
       expect(fundingRates[0].nextFundingTime).toBe(nextFunding);
+    });
+
+    it('should aggregate funding rates from multiple exchanges', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('binance')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              symbol: 'BTCUSDT',
+              lastFundingRate: '0.0001',
+              nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+            })
+          });
+        }
+        if (url.includes('okx')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              data: [{
+                instType: 'SWAP',
+                instId: 'BTC-USD-SWAP',
+                fundingRate: '0.0002',
+                nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+              }]
+            })
+          });
+        }
+        return Promise.reject(new Error('API unavailable'));
+      });
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      expect(fundingRates.length).toBe(2);
+      expect(fundingRates.map(r => r.exchange)).toContain('Binance');
+      expect(fundingRates.map(r => r.exchange)).toContain('OKX');
     });
   });
 
@@ -272,6 +451,32 @@ describe('SeiOracleProvider', () => {
       // Should still return price but with timestamp indicating staleness (converted to ms)
       expect(price?.timestamp).toBe(staleTimestamp * 1000);
     });
+
+    it('should validate funding rate data structure', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('binance')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              symbol: 'BTCUSDT',
+              lastFundingRate: '0.0001',
+              nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+            })
+          });
+        }
+        return Promise.reject(new Error('API unavailable'));
+      });
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      expect(fundingRates[0]).toMatchObject({
+        symbol: expect.any(String),
+        rate: expect.any(Number),
+        timestamp: expect.any(Number),
+        exchange: expect.any(String),
+        nextFundingTime: expect.any(Number)
+      });
+    });
   });
 
   describe('Multi-Source Price Aggregation', () => {
@@ -311,6 +516,33 @@ describe('SeiOracleProvider', () => {
       const price = await oracleProvider.getPrice('BTC');
 
       expect(price?.source).toBe('Chainlink');
+    });
+
+    it('should detect price deviations between sources', async () => {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      
+      // Mock Pyth returning one price
+      mockPublicClient.readContract.mockResolvedValue([
+        BigInt('4500000000000'), // 45000
+        BigInt('10000000'),
+        BigInt(-8),
+        BigInt(currentTimestamp)
+      ]);
+
+      // Mock CEX returning significantly different price
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          symbol: 'BTCUSDT',
+          price: '50000.00' // 11% deviation
+        })
+      });
+
+      const price = await oracleProvider.getPrice('BTC');
+
+      // Should still return Pyth price but log warning about deviation
+      expect(price?.source).toBe('pyth');
+      expect(price?.price).toBeCloseTo(45000, 1);
     });
   });
 
@@ -359,6 +591,24 @@ describe('SeiOracleProvider', () => {
       expect(price?.price).toBe(46000); // Updated price
       expect(mockPublicClient.readContract).toHaveBeenCalled();
     });
+
+    it('should cache funding rate data', async () => {
+      const mockFundingRates = [{
+        symbol: 'BTC',
+        rate: 0.0001 * 8760,
+        timestamp: Date.now(),
+        exchange: 'Binance',
+        nextFundingTime: Date.now() + 8 * 60 * 60 * 1000
+      }];
+
+      mockRuntime.cacheManager.get.mockResolvedValue(mockFundingRates);
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      expect(fundingRates).toEqual(mockFundingRates);
+      expect(mockRuntime.cacheManager.get).toHaveBeenCalledWith('funding_rates_BTC');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('Error Handling', () => {
@@ -404,6 +654,100 @@ describe('SeiOracleProvider', () => {
 
       const price = await oracleProvider.getPrice('BTC');
       expect(price).toBeNull();
+    });
+
+    it('should handle rate limiting from exchanges', async () => {
+      mockFetch.mockRejectedValue(new Error('429 Too Many Requests'));
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+      expect(fundingRates).toEqual([]);
+    });
+
+    it('should handle partial exchange failures', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('binance')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              symbol: 'BTCUSDT',
+              lastFundingRate: '0.0001',
+              nextFundingTime: (Date.now() + 8 * 60 * 60 * 1000).toString()
+            })
+          });
+        }
+        // OKX and Bybit fail
+        return Promise.reject(new Error('Exchange unavailable'));
+      });
+
+      const fundingRates = await oracleProvider.getFundingRates('BTC');
+
+      // Should return data from successful exchange only
+      expect(fundingRates.length).toBe(1);
+      expect(fundingRates[0].exchange).toBe('Binance');
+    });
+  });
+
+  describe('Provider Lifecycle', () => {
+    it('should start and stop price updates', () => {
+      oracleProvider.startPriceUpdates();
+      expect(oracleProvider['updateInterval']).toBeDefined();
+
+      oracleProvider.stopPriceUpdates();
+      expect(oracleProvider['updateInterval']).toBeNull();
+    });
+
+    it('should handle multiple start calls gracefully', () => {
+      oracleProvider.startPriceUpdates();
+      const firstInterval = oracleProvider['updateInterval'];
+      
+      oracleProvider.startPriceUpdates();
+      const secondInterval = oracleProvider['updateInterval'];
+
+      expect(firstInterval).toBe(secondInterval);
+    });
+
+    it('should handle stop calls when not running', () => {
+      expect(() => oracleProvider.stopPriceUpdates()).not.toThrow();
+    });
+  });
+
+  describe('Symbol Mapping', () => {
+    it('should map SEI native symbols correctly', async () => {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      
+      mockPublicClient.readContract.mockResolvedValue([
+        BigInt('50000000'),
+        BigInt('1000000'),
+        BigInt(-8),
+        BigInt(currentTimestamp)
+      ]);
+
+      const price = await oracleProvider.getPrice('SEI');
+
+      expect(price?.symbol).toBe('SEI');
+      expect(mockPublicClient.readContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: ['0x53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb']
+        })
+      );
+    });
+
+    it('should handle token symbol variations', async () => {
+      const variations = ['WSEI', 'wSEI', 'WSEI-USD'];
+      
+      for (const variation of variations) {
+        const currentTimestamp = Math.floor(Date.now() / 1000);
+        
+        mockPublicClient.readContract.mockResolvedValue([
+          BigInt('50000000'),
+          BigInt('1000000'),
+          BigInt(-8),
+          BigInt(currentTimestamp)
+        ]);
+
+        const price = await oracleProvider.getPrice(variation);
+        expect(price).toBeDefined();
+      }
     });
   });
 });

@@ -383,6 +383,7 @@ export const fundingArbitrageAction: Action = {
   name: "FUNDING_ARBITRAGE",
   similes: [
     "ARBITRAGE_SCAN",
+    "ARBITRAGE_FUNDING",
     "FUNDING_OPPORTUNITY",
     "RATE_ARBITRAGE",
     "YIELD_ARBITRAGE"
