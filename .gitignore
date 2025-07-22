@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
 
 # Build outputs
 dist/
@@ -27,6 +30,7 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Coverage reports
 coverage/
@@ -35,3 +39,6 @@ coverage/
 # Cache
 .cache/
 .parcel-cache/
+
+# Test artifacts
+.vitest/
