@@ -130,6 +130,9 @@ export function createMockMemory(text: string, entityId?: string): Memory {
   };
 }
 
+// Alias for createMockMemory for backward compatibility
+export const createMockMessage = createMockMemory;
+
 export function createMockState(): State {
   return {
     userId: generateMockUUID(),

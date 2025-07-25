@@ -219,3 +219,46 @@ export function getAvailableNetworks(): string[] {
 
 // Type for network names
 export type SeiNetworkName = keyof typeof seiChains;
+
+export interface YeiFinanceConfig {
+  api3ContractAddress: string;
+  pythContractAddress: string;
+  redstoneContractAddress: string;
+  rpcUrl: string;
+}
+
+export function validateYeiFinanceConfig(runtime: any): YeiFinanceConfig {
+  const api3Contract = runtime?.getSetting?.('YEI_API3_CONTRACT') || process.env.YEI_API3_CONTRACT;
+  const pythContract = runtime?.getSetting?.('YEI_PYTH_CONTRACT') || process.env.YEI_PYTH_CONTRACT;
+  const redstoneContract = runtime?.getSetting?.('YEI_REDSTONE_CONTRACT') || process.env.YEI_REDSTONE_CONTRACT;
+  const rpcUrl = runtime?.getSetting?.('SEI_RPC_URL') || process.env.SEI_RPC_URL;
+
+  // In test environment, provide defaults
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      api3ContractAddress: api3Contract || '0x1234567890abcdef1234567890abcdef12345678',
+      pythContractAddress: pythContract || '0x2880aB155794e7179c9eE2e38200202908C17B43',
+      redstoneContractAddress: redstoneContract || '0x3456789012345678901234567890123456789012',
+      rpcUrl: rpcUrl || 'https://evm-rpc-testnet.sei-apis.com'
+    };
+  }
+
+  if (!api3Contract) {
+    throw new Error('YEI_API3_CONTRACT is required but not configured');
+  }
+
+  if (!pythContract) {
+    throw new Error('YEI_PYTH_CONTRACT is required but not configured');
+  }
+
+  if (!redstoneContract) {
+    throw new Error('YEI_REDSTONE_CONTRACT is required but not configured');
+  }
+
+  return {
+    api3ContractAddress: api3Contract,
+    pythContractAddress: pythContract,
+    redstoneContractAddress: redstoneContract,
+    rpcUrl: rpcUrl || 'https://evm-rpc.sei-apis.com'
+  };
+}

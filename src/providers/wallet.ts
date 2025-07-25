@@ -10,7 +10,6 @@ import {
     type Provider,
     type Memory,
     type State,
-    type ICacheManager,
     elizaLogger,
 } from "@elizaos/core";
 import type {
@@ -45,7 +44,6 @@ export class WalletProvider {
 
     constructor(
         accountOrPrivateKey: PrivateKeyAccount | `0x${string}`,
-        private cacheManager: ICacheManager,
         chain: ChainWithName,
     ) {
         this.setAccount(accountOrPrivateKey);
@@ -134,15 +132,8 @@ export class WalletProvider {
             return null;
         }
         
-        try {
-            const cached = await this.cacheManager.get<T>(
-                path.join(this.cacheKey, key)
-            );
-            return cached ?? null; // Fix: Return null if cached is undefined
-        } catch (error) {
-            // If cache fails, just return null
-            return null;
-        }
+        // File-based cache not available, return null
+        return null;
     }
     
     // private async readFromCache<T>(key: string): Promise<T | null> {
@@ -153,16 +144,12 @@ export class WalletProvider {
     // }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        // Skip cache operations in test environment
+        // Skip cache operations in test environment or file-based cache not available
         if (process.env.NODE_ENV === 'test') {
             return;
         }
         
-        try {
-            await this.cacheManager.set(path.join(this.cacheKey, key), data, this.CACHE_EXPIRY_SEC);
-        } catch (error) {
-            // If cache fails, just continue
-        }
+        // File-based cache not available, skip
     }
 
     private async getCachedData<T>(key: string): Promise<T | null> {
@@ -292,10 +279,11 @@ export const initWalletProvider = async (runtime: IAgentRuntime) => {
     if (!privateKey) {
         throw new Error("SEI_PRIVATE_KEY is missing");
     }
-    return new WalletProvider(privateKey, runtime.cacheManager, chainData);
+    return new WalletProvider(privateKey, chainData);
 };
 
-export const evmWalletProvider: Provider = {
+export const evmWalletProvider = {
+    name: "evmWallet",
     async get(
         runtime: IAgentRuntime,
         _message: Memory,

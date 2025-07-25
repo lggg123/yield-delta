@@ -8,6 +8,7 @@ import { dragonSwapTradeAction } from "./actions/dragonswap";
 import { fundingArbitrageAction } from "./actions/funding-arbitrage";
 import { perpsTradeAction } from "./actions/perp-trading";
 import { rebalanceEvaluatorAction } from "./actions/rebalance";
+import { yeiFinanceAction } from './actions/yei-finance';
 
 // Import utilities and types from environment
 import { 
@@ -30,12 +31,13 @@ export const seiYieldDeltaPlugin: Plugin = {
         dragonSwapTradeAction,
         fundingArbitrageAction,
         perpsTradeAction,
-        rebalanceEvaluatorAction
+        rebalanceEvaluatorAction,
+        yeiFinanceAction
     ],
     evaluators: [],
     providers: [
-        evmWalletProvider,
-        oracleProvider
+        evmWalletProvider as any,
+        oracleProvider as any
     ],
 };
 
@@ -45,7 +47,8 @@ export {
     dragonSwapTradeAction,
     fundingArbitrageAction,
     perpsTradeAction,
-    rebalanceEvaluatorAction
+    rebalanceEvaluatorAction,
+    yeiFinanceAction
 };
 
 // Export providers
