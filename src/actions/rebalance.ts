@@ -414,11 +414,11 @@ export const rebalanceEvaluatorAction: Action = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Analyze my portfolio allocation" }
       },
       {
-        user: "{{user2}}",
+        name: "{{user2}}",
         content: { 
           text: "📊 Analyzing your portfolio...",
           action: "PORTFOLIO_REBALANCE"
@@ -427,11 +427,11 @@ export const rebalanceEvaluatorAction: Action = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Rebalance my portfolio using conservative strategy" }
       },
       {
-        user: "{{user2}}",
+        name: "{{user2}}",
         content: { 
           text: "🔄 Rebalancing portfolio with conservative DeFi strategy...",
           action: "PORTFOLIO_REBALANCE"

@@ -1,21 +1,48 @@
 import { ByteArray, formatEther, parseEther, type Hex } from "viem";
 import {
     elizaLogger,
-    Action,
-    HandlerCallback,
-    IAgentRuntime,
-    Memory,
-    State,
     AgentRuntime,
-    createMessageMemory,
     composePrompt,
+    parseJSONObjectFromText,
     createActionResult,
+    createMessageMemory,
+    HandlerCallback,
+    Action,
     v1,
     v2,
+    type IAgentRuntime,
+    type Memory,
+    type State,
 } from "@elizaos/core";
 
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
-import { ADDRESS_PRECOMPILE_ABI, ADDRESS_PRECOMPILE_ADDRESS, type Transaction, type TransferParams } from "../types";
+import { WalletProvider } from "../providers/wallet";
+import { ADDRESS_PRECOMPILE_ABI, ADDRESS_PRECOMPILE_ADDRESS, ChainWithName } from "../types";
+import { sei, seiTestnet } from "viem/chains";
+
+// Create simplified interfaces to avoid deep type instantiation
+interface SimpleTransferParams {
+    amount: string;
+    toAddress: string;
+}
+
+interface SimpleTransferResponse {
+    hash: string;
+    to: string;
+}
+
+interface TransferParams {
+    amount: string;
+    toAddress: string;
+    data?: string;
+}
+
+interface Transaction {
+    hash: string;
+    from: string;
+    to: string;
+    value: string;
+    data: string;
+}
 
 export const transferTemplate = `You are an AI assistant specialized in processing cryptocurrency transfer requests. Your task is to extract specific information from user messages and format it into a structured JSON response.
 
@@ -59,6 +86,8 @@ Remember:
 - The recipient address must be a valid Ethereum address starting with "0x" or a vald SEI address startng with "sei1".
 
 Now, process the user's request and provide your response.
+
+Current message: "{{currentMessage}}"
 `;
 
 // Exported for tests
@@ -66,166 +95,253 @@ export class TransferAction {
     constructor(private walletProvider: WalletProvider) {}
 
     async transfer(params: TransferParams): Promise<Transaction> {
-        const chain = this.walletProvider.getCurrentChain()
+        const chain = this.walletProvider.getCurrentChain();
         elizaLogger.log(
-            `Transferring: ${params.amount} tokens to (${params.toAddress} on ${chain.name})`
+            `Transferring: ${params.amount} tokens to ${params.toAddress} on ${chain.name}`
         );
         
         let recipientAddress: `0x${string}`;
 
+        // Handle SEI bech32 address conversion
         if (params.toAddress.startsWith("sei")) {
             const publicClient = this.walletProvider.getEvmPublicClient();
-            const evmAddress = await publicClient.readContract({
-                address: ADDRESS_PRECOMPILE_ADDRESS,
-                abi: ADDRESS_PRECOMPILE_ABI,
-                functionName: 'getEvmAddr',
-                args: [params.toAddress],
-            });
+            
+            try {
+                const evmAddress = await publicClient.readContract({
+                    address: ADDRESS_PRECOMPILE_ADDRESS as `0x${string}`,
+                    abi: ADDRESS_PRECOMPILE_ABI,
+                    functionName: 'getEvmAddr',
+                    args: [params.toAddress],
+                } as any);
 
-            if (!evmAddress || !evmAddress.startsWith("0x")) {
-                throw new Error(`ERROR: Recipient does not have valid EVM address. Got: ${evmAddress}`);
+                if (!evmAddress || typeof evmAddress !== 'string' || !evmAddress.startsWith("0x")) {
+                    throw new Error(`ERROR: Recipient does not have valid EVM address. Got: ${evmAddress}`);
+                }
+
+                elizaLogger.log(`Translated address ${params.toAddress} to EVM address ${evmAddress}`);
+                recipientAddress = evmAddress as `0x${string}`;
+            } catch (error) {
+                throw new Error(`Failed to translate SEI address: ${error.message}`);
             }
-
-            elizaLogger.log(`Translated address ${params.toAddress} to EVM address ${evmAddress}`);
-            recipientAddress = evmAddress as `0x${string}`;
         } else {
-            if (!params.toAddress.startsWith("0x")) {
-                throw new Error(`ERROR: Recipient address must start with '0x'. Got: ${params.toAddress}`);
+            // Handle EVM address
+            if (!params.toAddress.startsWith("0x") || params.toAddress.length !== 42) {
+                throw new Error(`ERROR: Recipient address must be valid EVM address (0x...). Got: ${params.toAddress}`);
             }
             recipientAddress = params.toAddress as `0x${string}`;
         }
 
+        // Get wallet client and validate account
         const walletClient = this.walletProvider.getEvmWalletClient();
-        if (!walletClient.account) {
-            throw new Error("Wallet client account is undefined");
+        if (!walletClient?.account?.address) {
+            throw new Error("Wallet client account is undefined or invalid");
         }
 
         try {
-            // Simplified transaction without the problematic kzg and blob properties
-            const hash = await walletClient.sendTransaction({
-                account: walletClient.account,
+            // Execute the transfer
+            elizaLogger.log(`Sending transaction from ${walletClient.account.address} to ${recipientAddress}`);
+            
+            const valueInWei = parseEther(params.amount);
+            const transactionRequest = {
                 to: recipientAddress,
-                value: parseEther(params.amount),
+                value: valueInWei,
                 data: (params.data as Hex) || '0x',
-            } as any); // Cast to any to bypass type issues
+            };
+
+            // Use type assertion to avoid deep type issues
+            const hash = await (walletClient as any).sendTransaction(transactionRequest);
+
+            if (!hash || typeof hash !== 'string') {
+                throw new Error('Invalid transaction hash received');
+            }
+
+            elizaLogger.log(`Transaction sent successfully. Hash: ${hash}`);
 
             return {
                 hash,
                 from: walletClient.account.address,
                 to: params.toAddress,
-                value: parseEther(params.amount),
+                value: parseEther(params.amount).toString(),
                 data: (params.data as Hex) || '0x',
             };
 
         } catch (error) {
+            elizaLogger.error(`Transfer failed: ${error.message}`);
             throw new Error(`Transfer failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Validate transfer parameters before execution
+     */
+    validateParams(params: TransferParams): void {
+        if (!params.amount || isNaN(Number(params.amount)) || Number(params.amount) <= 0) {
+            throw new Error('Invalid amount: must be a positive number');
+        }
+
+        if (!params.toAddress || params.toAddress.length === 0) {
+            throw new Error('Invalid recipient address: cannot be empty');
+        }
+
+        // Validate SEI bech32 address format
+        if (params.toAddress.startsWith('sei')) {
+            if (params.toAddress.length !== 43) {
+                throw new Error('Invalid SEI address: must be 43 characters long');
+            }
+        }
+        // Validate EVM address format
+        else if (params.toAddress.startsWith('0x')) {
+            if (params.toAddress.length !== 42) {
+                throw new Error('Invalid EVM address: must be 42 characters long');
+            }
+        } else {
+            throw new Error('Invalid address format: must start with "sei" or "0x"');
+        }
+    }
+
+    /**
+     * Get estimated gas for the transfer
+     */
+    async estimateGas(params: TransferParams): Promise<bigint> {
+        try {
+            this.validateParams(params);
+            
+            const publicClient = this.walletProvider.getEvmPublicClient();
+            const walletClient = this.walletProvider.getEvmWalletClient();
+            
+            if (!walletClient?.account?.address) {
+                throw new Error("Wallet account not available for gas estimation");
+            }
+
+            let recipientAddress: `0x${string}`;
+            
+            if (params.toAddress.startsWith("sei")) {
+                const evmAddress = await publicClient.readContract({
+                    address: ADDRESS_PRECOMPILE_ADDRESS as `0x${string}`,
+                    abi: ADDRESS_PRECOMPILE_ABI,
+                    functionName: 'getEvmAddr',
+                    args: [params.toAddress],
+                } as any);
+                recipientAddress = evmAddress as `0x${string}`;
+            } else {
+                recipientAddress = params.toAddress as `0x${string}`;
+            }
+
+            const gasEstimate = await (publicClient as any).estimateGas({
+                account: walletClient.account.address,
+                to: recipientAddress,
+                value: parseEther(params.amount),
+                data: (params.data as Hex) || '0x',
+            });
+
+            return gasEstimate;
+        } catch (error) {
+            elizaLogger.error(`Gas estimation failed: ${error.message}`);
+            // Return a conservative estimate if estimation fails
+            return BigInt(21000);
         }
     }
 }
 
-const buildTransferDetails = async (
-    state: State,
-    runtime: IAgentRuntime,
-    _wp: WalletProvider
-): Promise<TransferParams> => {
-    // Simplified parameter extraction from message text
-    const messageText = state.recentMessagesData?.[0]?.content?.text || "";
-    
-    // Extract amount and address from message using regex
-    const amountMatch = messageText.match(/(\d+(?:\.\d+)?)\s*(?:SEI|sei)/i);
-    const addressMatch = messageText.match(/(0x[a-fA-F0-9]{40}|sei1[a-z0-9]{38})/);
-    
-    if (!amountMatch || !addressMatch) {
-        throw new Error("Could not extract transfer amount or recipient address from message");
-    }
-    
-    return {
-        amount: amountMatch[1],
-        toAddress: addressMatch[1]
-    };
-};
-
 export const transferAction: Action = {
     name: "TRANSFER_TOKENS",
+    similes: [
+        "SEND_TOKENS", 
+        "TOKEN_TRANSFER", 
+        "MOVE_TOKENS", 
+        "SEND_SEI",
+        "TRANSFER"
+    ],
+    validate: async (runtime: IAgentRuntime, message: Memory) => {
+        try {
+            const privateKey = runtime.getSetting?.("SEI_PRIVATE_KEY");
+            if (!privateKey || !privateKey.startsWith("0x")) {
+                return false;
+            }
+
+            const text = message.content.text.toLowerCase();
+            return (
+                (text.includes("transfer") || text.includes("send") || text.includes("move")) &&
+                (text.includes("sei") || text.includes("token")) &&
+                (text.includes("0x") || text.includes("sei1"))
+            );
+        } catch (error) {
+            elizaLogger.error("Transfer validation error:", error);
+            return false;
+        }
+    },
     description: "Transfer SEI tokens between addresses on the Sei network",
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
         state: State,
-        _options: Record<string, unknown>,
-        callback?: HandlerCallback
+        _options: any, // Use any instead of complex Record type
+        callback?: any // Simplify callback type
     ): Promise<void> => {
-        
-        let updatedState = state;
-        
-        if (!updatedState) {
-            // Use AgentRuntime's composeState method instead of runtime.composeState
-            updatedState = (await (runtime as any).composeState?.(message)) as State || state;
-        }
-
         elizaLogger.debug("Transfer action handler called");
         
         try {
+            // Build transfer parameters
+            const params = await buildTransferDetails(message, runtime);
+            
             const walletProvider = await initWalletProvider(runtime);
             const action = new TransferAction(walletProvider);
 
-            const paramOptions = await buildTransferDetails(
-                updatedState,
-                runtime,
-                walletProvider
-            );
-
-            const transferResp = await action.transfer(paramOptions);
+            const transferResp = await action.transfer(params);
             
             if (callback) {
-                callback({
-                    text: `✅ Successfully transferred ${paramOptions.amount} SEI to ${paramOptions.toAddress}\n\n📄 Transaction Hash: ${transferResp.hash}\n🔗 Chain: ${walletProvider.getCurrentChain().name}`,
+                // Store values in variables to break type complexity
+                const chainName = String(walletProvider.getCurrentChain().name);
+                const hash = String(transferResp.hash);
+                const recipient = String(transferResp.to);
+                const amount = String(params.amount);
+                const toAddress = String(params.toAddress);
+                
+                const successMessage = `✅ Successfully transferred ${amount} SEI to ${toAddress}\n\n📄 Transaction Hash: ${hash}\n🔗 Chain: ${chainName}`;
+                
+                // Create simple response object
+                const response = {
+                    text: successMessage,
                     content: {
                         success: true,
-                        hash: transferResp.hash,
-                        amount: formatEther(transferResp.value),
-                        recipient: transferResp.to,
-                        chain: walletProvider.getCurrentChain().name,
+                        hash,
+                        amount,
+                        recipient,
+                        chain: chainName,
                     },
-                });
+                };
+                
+                (callback as any)(response);
             }
             
-        } catch (error) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             elizaLogger.error("Error during token transfer:", error);
             
             if (callback) {
-                callback({
-                    text: `❌ Transfer failed: ${error.message}`,
+                const errorResponse = {
+                    text: `❌ Transfer failed: ${errorMessage}`,
                     content: { 
                         error: true, 
-                        message: error.message 
+                        message: errorMessage 
                     },
-                });
+                };
+                
+                (callback as any)(errorResponse);
             }
-        }
-    },
-    
-    validate: async (runtime: IAgentRuntime) => {
-        try {
-            const privateKey = runtime.getSetting?.("SEI_PRIVATE_KEY") || 
-                             (runtime as any).settings?.SEI_PRIVATE_KEY;
-            return typeof privateKey === "string" && privateKey.startsWith("0x");
-        } catch (error) {
-            elizaLogger.error("Validation error:", error);
-            return false;
         }
     },
     
     examples: [
         [
             {
-                user: "{{user1}}",
+                name: "{{user1}}",
                 content: {
                     text: "Transfer 1 SEI to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
                 },
             },
             {
-                user: "{{agentName}}",
+                name: "{{agentName}}",
                 content: {
                     text: "I'll help you transfer 1 SEI to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
                 },
@@ -233,19 +349,84 @@ export const transferAction: Action = {
         ],
         [
             {
-                user: "{{user1}}",
+                name: "{{user1}}",
                 content: {
-                    text: "Send 5 SEI to sei1vpz36punknkdjfs7ew2vkdwws8ydcquy00hhsd",
+                    text: "Send 5 SEI to sei1abc123def456",
                 },
             },
             {
-                user: "{{agentName}}",
+                name: "{{agentName}}",
                 content: {
-                    text: "I'll transfer 5 SEI to the sei address sei1vpz36punknkdjfs7ew2vkdwws8ydcquy00hhsd",
+                    text: "Transferring 5 SEI to sei1abc123def456",
                 },
             },
         ],
     ],
-    
-    similes: ["SEND_TOKENS", "TOKEN_TRANSFER", "MOVE_TOKENS", "SEND_SEI", "TRANSFER"],
 };
+
+// Simplified helper functions
+async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Promise<SimpleTransferParams> {
+    const messageText = message.content?.text || "";
+    const params = parseTransferParams(messageText);
+    
+    if (!params) {
+        throw new Error("Could not parse transfer parameters. Please specify amount and recipient address.");
+    }
+    
+    return params;
+}
+
+function parseTransferParams(text: string): SimpleTransferParams | null {
+    // Extract amount and address using regex
+    const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:SEI|sei)/i);
+    const addressMatch = text.match(/(0x[a-fA-F0-9]{40}|sei1[a-z0-9]{38})/);
+    
+    if (!amountMatch || !addressMatch) {
+        return null;
+    }
+    
+    return {
+        amount: amountMatch[1],
+        toAddress: addressMatch[1]
+    };
+}
+
+// Helper function to create ChainWithName from network string
+function createChainWithName(network: string): ChainWithName {
+    let chain;
+    let name;
+
+    switch (network.toLowerCase()) {
+        case 'mainnet':
+            chain = sei;
+            name = 'sei-mainnet';
+            break;
+        case 'testnet':
+        case 'atlantic-2':
+            chain = seiTestnet;
+            name = 'sei-testnet';
+            break;
+        default:
+            throw new Error(`Unsupported network: ${network}`);
+    }
+
+    return {
+        name,
+        chain
+    };
+}
+
+// Update your initWalletProvider function
+async function initWalletProvider(runtime: IAgentRuntime): Promise<WalletProvider> {
+    const privateKey = runtime.getSetting("SEI_PRIVATE_KEY");
+    const network = runtime.getSetting("SEI_NETWORK") || "testnet";
+    
+    if (!privateKey || !privateKey.startsWith("0x")) {
+        throw new Error("Invalid or missing SEI_PRIVATE_KEY");
+    }
+
+    // Create the proper ChainWithName object
+    const chainWithName = createChainWithName(network);
+    
+    return new WalletProvider(privateKey as `0x${string}`, chainWithName);
+}

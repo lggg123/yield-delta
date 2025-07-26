@@ -538,11 +538,11 @@ export const fundingArbitrageAction: Action = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Scan for funding arbitrage opportunities" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "Scanning funding rates across exchanges for arbitrage opportunities...",
           action: "FUNDING_ARBITRAGE"
@@ -551,11 +551,11 @@ export const fundingArbitrageAction: Action = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Execute arbitrage BTC" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "Executing BTC funding rate arbitrage strategy...",
           action: "FUNDING_ARBITRAGE"

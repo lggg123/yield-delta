@@ -145,11 +145,11 @@ Ask about specific lending rates, oracle prices, or collateral requirements!`;
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "What are the current YEI Finance lending rates?" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: { 
           text: "Let me check the current YEI Finance lending rates and oracle prices...",
           action: "YEI_FINANCE"
@@ -158,11 +158,11 @@ Ask about specific lending rates, oracle prices, or collateral requirements!`;
     ],
     [
       {
-        user: "{{user1}}",  
+        name: "{{user1}}",  
         content: { text: "How does YEI Finance's multi-oracle system work?" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "YEI Finance uses a sophisticated multi-oracle strategy...",
           action: "YEI_FINANCE"

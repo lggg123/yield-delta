@@ -1,10 +1,17 @@
 import {
+    PublicClient,
+    WalletClient,
+    HttpTransport,
+    Chain,
+    Account,
+    Address,
     createPublicClient,
     createWalletClient,
-    formatUnits,
     http,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+    formatUnits,
+    PrivateKeyAccount
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts'; // Fix: Import from viem/accounts
 import {
     type IAgentRuntime,
     type Provider,
@@ -12,16 +19,6 @@ import {
     type State,
     elizaLogger,
 } from "@elizaos/core";
-import type {
-    Address,
-    WalletClient,
-    PublicClient,
-    Chain,
-    HttpTransport,
-    Account,
-    PrivateKeyAccount,
-    TestClient,
-} from "viem";
 import * as viemChains from "viem/chains";
 import NodeCache from "node-cache";
 import * as path from "node:path";
@@ -34,10 +31,13 @@ export const seiChains = {
     "devnet": viemChains.seiDevnet,
 }
 
+// Create type aliases to break the deep instantiation
+type ViemPublicClient = ReturnType<typeof createPublicClient>;
+type ViemWalletClient = ReturnType<typeof createWalletClient>;
+
 export class WalletProvider {
     private cache: NodeCache;
-    // private cacheKey: string = "evm/wallet";
-    private cacheKey = "evm/wallet"; // Remove explicit type annotation
+    private cacheKey = "evm/wallet";
     private currentChain: ChainWithName;
     private CACHE_EXPIRY_SEC = 5;
     account: PrivateKeyAccount;
@@ -47,9 +47,7 @@ export class WalletProvider {
         chain: ChainWithName,
     ) {
         this.setAccount(accountOrPrivateKey);
-
         this.setCurrentChain(chain);
-
         this.cache = new NodeCache({ stdTTL: this.CACHE_EXPIRY_SEC });
     }
 
@@ -64,46 +62,41 @@ export class WalletProvider {
         return this.currentChain;
     }
 
-    getPublicClient(): PublicClient<HttpTransport, Chain, Account | undefined> {
+    getPublicClient(): ViemPublicClient {
         const transport = this.createHttpTransport();
 
-        const publicClient = createPublicClient({
+        return createPublicClient({
             chain: this.currentChain.chain,
             transport,
         });
-
-        return publicClient;
     }
 
-    getEvmWalletClient(): WalletClient {
+    // Fix: Use simple WalletClient type without complex generics
+    getEvmWalletClient(): ViemWalletClient {
         const transport = this.createHttpTransport();
 
-        const walletClient = createWalletClient({
+        return createWalletClient({
             chain: this.currentChain.chain,
             transport,
             account: this.account,
         });
-
-        return walletClient;
     }
 
-    getEvmPublicClient() {
+    getEvmPublicClient(): ViemPublicClient {
         const transport = this.createHttpTransport();
 
-        const publicClient = createPublicClient({
+        return createPublicClient({
             chain: this.currentChain.chain,
             transport: transport,
         });
-
-        return publicClient
     }
 
     async getWalletBalance(): Promise<string | null> {
-        const cacheKey = `seiWalletBalance_${this.currentChain.name}`; // Fix: Use template literal
+        const cacheKey = `seiWalletBalance_${this.currentChain.name}`;
         const cachedData = await this.getCachedData<string>(cacheKey);
         if (cachedData) {
             elizaLogger.log(
-                `Returning cached wallet balance for sei chain: ${this.currentChain.name}` // Fix: Use template literal
+                `Returning cached wallet balance for sei chain: ${this.currentChain.name}`
             );
             return cachedData;
         }
@@ -127,42 +120,26 @@ export class WalletProvider {
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
-        // Skip cache operations in test environment
         if (process.env.NODE_ENV === 'test') {
             return null;
         }
-        
-        // File-based cache not available, return null
         return null;
     }
-    
-    // private async readFromCache<T>(key: string): Promise<T | null> {
-    //     const cached = await this.cacheManager.get<T>(
-    //         path.join(this.cacheKey, key)
-    //     );
-    //     return cached;
-    // }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        // Skip cache operations in test environment or file-based cache not available
         if (process.env.NODE_ENV === 'test') {
             return;
         }
-        
-        // File-based cache not available, skip
     }
 
     private async getCachedData<T>(key: string): Promise<T | null> {
-        // Check in-memory cache first
         const cachedData = this.cache.get<T>(key);
         if (cachedData) {
             return cachedData;
         }
 
-        // Check file-based cache
         const fileCachedData = await this.readFromCache<T>(key);
         if (fileCachedData) {
-            // Populate in-memory cache
             this.cache.set(key, fileCachedData);
             return fileCachedData;
         }
@@ -171,10 +148,7 @@ export class WalletProvider {
     }
 
     private async setCachedData<T>(cacheKey: string, data: T): Promise<void> {
-        // Set in-memory cache
         this.cache.set(cacheKey, data);
-
-        // Write to file-based cache
         await this.writeToCache(cacheKey, data);
     }
 
@@ -226,11 +200,12 @@ export class WalletProvider {
         return seiChain;
     }
 }
+
 const genChainFromRuntime = (
     runtime: IAgentRuntime
 ): ChainWithName => {
     const sei_network = runtime.getSetting("SEI_NETWORK");
-    if (typeof sei_network !== "string") { // Fix: Ensure sei_network is a string
+    if (typeof sei_network !== "string") {
         throw new Error("SEI_NETWORK must be a string");
     }
 
@@ -241,37 +216,14 @@ const genChainFromRuntime = (
 
     let chain = seiChains[sei_network];
     const rpcurl = runtime.getSetting("SEI_RPC_URL");
-    if (typeof rpcurl === "string") { // Fix: Ensure rpcurl is a string
+    if (typeof rpcurl === "string") {
         chain = WalletProvider.genSeiChainFromName(sei_network, rpcurl);
     }
 
-    return { name: sei_network, chain: chain }; // Fix: Ensure name is always a string
+    return { name: sei_network, chain: chain };
 };
 
-// const genChainFromRuntime = (
-//     runtime: IAgentRuntime
-// ): ChainWithName => {
-//     const sei_network = runtime.getSetting("SEI_NETWORK");
-//     const validChains = Object.keys(seiChains)
-//     if (!validChains.includes(sei_network)) {
-//         // throw new Error("Invalid SEI_NETWORK " + sei_network + " Must be one of " + validChains.join(", "));
-//         throw new Error(`Invalid SEI_NETWORK ${sei_network}. Must be one of ${validChains.join(", ")}`);
-//     }
-
-//     let chain = seiChains[sei_network]
-//     const rpcurl = runtime.getSetting("SEI_RPC_URL");
-//     if (rpcurl) {
-//         chain = WalletProvider.genSeiChainFromName(
-//             sei_network,
-//             rpcurl
-//         );
-//     }
-
-//     return {name: sei_network, chain: chain};
-// };
-
 export const initWalletProvider = async (runtime: IAgentRuntime) => {
-
     const chainData = genChainFromRuntime(runtime)
     const privateKey = runtime.getSetting(
         "SEI_PRIVATE_KEY"

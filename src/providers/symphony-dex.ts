@@ -1,5 +1,5 @@
 import { createPublicClient, http, Address } from 'viem';
-import { seiTestnet, seiMainnet } from 'viem/chains';
+import { seiTestnet, sei } from 'viem/chains';
 
 interface SymphonyConfig {
   timeout: number;
@@ -45,7 +45,7 @@ export class SymphonyDexProvider {
   private publicClient: any;
 
   constructor(networkConfig: { network: string; rpcUrl: string }) {
-    const chain = networkConfig.network === 'mainnet' ? seiMainnet : seiTestnet;
+    const chain = networkConfig.network === 'mainnet' ? sei : seiTestnet;
     
     this.publicClient = createPublicClient({
       chain,
@@ -54,14 +54,14 @@ export class SymphonyDexProvider {
 
     this.config = {
       timeout: 10000,
-      chainId: networkConfig.network === 'mainnet' ? 1329 : 1328, // Mainnet vs Testnet
+      chainId: networkConfig.network === 'mainnet' ? 1329 : 1328,
       chainName: "sei",
       rpcUrl: networkConfig.rpcUrl,
       nativeAddress: "0x0",
       wrappedNativeAddress: "0xe30fedd158a2e3b13e9badaeabafc5516e95e8c7",
       slippage: "0.5",
       publicClient: this.publicClient,
-      tokens: {}, // Will be populated from Symphony's token list
+      tokens: {},
       additionalTokens: {},
       overrideDefaultTokens: false,
       feeParams: {
@@ -70,6 +70,29 @@ export class SymphonyDexProvider {
         feeSharePercentage: "0",
       },
     };
+  }
+
+  /**
+   * Helper method to create fetch with timeout
+   */
+  private async fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${this.config.timeout}ms`);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -84,8 +107,6 @@ export class SymphonyDexProvider {
     try {
       const symphonySlippage = slippage || this.config.slippage;
       
-      // Symphony SDK integration would go here
-      // For now, we'll simulate the API call structure
       const quoteUrl = `https://api.symphony.finance/v1/quote`;
       const params = new URLSearchParams({
         tokenIn: tokenIn.toLowerCase(),
@@ -95,12 +116,11 @@ export class SymphonyDexProvider {
         chainId: this.config.chainId.toString()
       });
 
-      const response = await fetch(`${quoteUrl}?${params}`, {
+      const response = await this.fetchWithTimeout(`${quoteUrl}?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        timeout: this.config.timeout
+        }
       });
 
       if (!response.ok) {
@@ -138,7 +158,6 @@ export class SymphonyDexProvider {
     try {
       const symphonySlippage = slippage || this.config.slippage;
 
-      // Symphony SDK swap execution would go here
       const swapUrl = `https://api.symphony.finance/v1/swap`;
       
       const swapParams = {
@@ -151,13 +170,12 @@ export class SymphonyDexProvider {
         chainId: this.config.chainId
       };
 
-      const response = await fetch(swapUrl, {
+      const response = await this.fetchWithTimeout(swapUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(swapParams),
-        timeout: this.config.timeout
+        body: JSON.stringify(swapParams)
       });
 
       if (!response.ok) {
@@ -178,12 +196,9 @@ export class SymphonyDexProvider {
    */
   async getSupportedTokens(): Promise<Record<string, TokenData>> {
     try {
-      // This would typically fetch from Symphony's token list API
       const tokensUrl = `https://api.symphony.finance/v1/tokens?chainId=${this.config.chainId}`;
       
-      const response = await fetch(tokensUrl, {
-        timeout: this.config.timeout
-      });
+      const response = await this.fetchWithTimeout(tokensUrl);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch Symphony tokens: ${response.status}`);
@@ -237,13 +252,12 @@ export class SymphonyDexProvider {
         chainId: this.config.chainId
       };
 
-      const response = await fetch(routeUrl, {
+      const response = await this.fetchWithTimeout(routeUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(params),
-        timeout: this.config.timeout
+        body: JSON.stringify(params)
       });
 
       if (!response.ok) {

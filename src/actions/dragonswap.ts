@@ -429,11 +429,11 @@ export const dragonSwapTradeAction: Action = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Swap 10 SEI for USDC on DragonSwap" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "I'll execute that swap for you on DragonSwap…",
           action: "DRAGONSWAP_TRADE"
@@ -442,11 +442,11 @@ export const dragonSwapTradeAction: Action = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Trade 5 USDC for SEI using DragonSwap with 1% slippage" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "Executing USDC to SEI swap with 1% slippage tolerance…",
           action: "DRAGONSWAP_TRADE"
