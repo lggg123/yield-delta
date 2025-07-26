@@ -234,7 +234,7 @@ export const perpsTradeAction: Action = {
     try {
       await validateSeiConfig(runtime);
       
-      const text = message.content.text.toLowerCase();
+      const text = message.content?.text?.toLowerCase() || "";
       return (
         (text.includes("open") || text.includes("close") || text.includes("short") || text.includes("long")) &&
         (text.includes("btc") || text.includes("eth") || text.includes("sei") || text.includes("sol") || text.includes("position"))
@@ -249,9 +249,9 @@ export const perpsTradeAction: Action = {
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state: State,
-    _options: any,
-    callback: HandlerCallback
+    state?: State,
+    _options?: any,
+    callback?: HandlerCallback
   ) => {
     elizaLogger.log("Processing perps trading request");
 
@@ -260,20 +260,21 @@ export const perpsTradeAction: Action = {
       
       const walletProvider = new WalletProvider(
         config.SEI_PRIVATE_KEY as `0x${string}`,
-        runtime.cacheManager,
-        { name: config.SEI_NETWORK, chain: seiChains[config.SEI_NETWORK] }
+        { name: config.SEI_NETWORK || "testnet", chain: seiChains[config.SEI_NETWORK || "testnet"] }
       );
 
-      const text = message.content.text.toLowerCase();
+      const text = message.content?.text?.toLowerCase() || "";
 
       // Parse trading parameters
       const params = parsePerpsParams(text);
       
       if (!params) {
-        callback({
-          text: "Invalid trading parameters. Use format: 'open long BTC 1000 2x' or 'close BTC position'",
-          error: true
-        });
+        if (callback) {
+          callback({
+            text: "Invalid trading parameters. Use format: 'open long BTC 1000 2x' or 'close BTC position'",
+            error: true
+          });
+        }
         return;
       }
 
@@ -281,27 +282,34 @@ export const perpsTradeAction: Action = {
       const result = await executePerpsTradeEngine(params, walletProvider);
 
       if (result.success) {
-        callback({
-          text: `✅ Perpetual trade executed successfully!\n\n` +
-                `Symbol: ${params.symbol}\n` +
-                `Side: ${params.side}\n` +
-                `Size: $${params.size}\n` +
-                `Leverage: ${params.leverage}x\n` +
-                `Transaction: ${result.txHash || 'simulated'}`
-        });
+        if (callback) {
+          callback({
+            text: `✅ Perpetual trade executed successfully!\n\n` +
+                  `Symbol: ${params.symbol}\n` +
+                  `Side: ${params.side}\n` +
+                  `Size: $${params.size}\n` +
+                  `Leverage: ${params.leverage}x\n` +
+                  `Transaction: ${result.txHash || 'simulated'}`
+          });
+        }
       } else {
+        if (callback) {
+          callback({
+            text: `❌ Failed to execute perpetual trade: ${result.error}`,
+            error: true
+          });
+        }
+      }
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      elizaLogger.error("Error in perps trading:", error);
+      if (callback) {
         callback({
-          text: `❌ Failed to execute perpetual trade: ${result.error}`,
+          text: `❌ Error executing perpetual trade: ${errorMessage}`,
           error: true
         });
       }
-
-    } catch (error) {
-      elizaLogger.error("Error in perps trading:", error);
-      callback({
-        text: `❌ Error executing perpetual trade: ${error.message}`,
-        error: true
-      });
     }
   },
 
@@ -360,10 +368,10 @@ async function executePerpsTradeEngine(params: PerpsTradeParams, walletProvider:
       success: true,
       txHash: `0x${Math.random().toString(16).substr(2, 64)}`
     };
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }

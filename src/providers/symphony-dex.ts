@@ -86,9 +86,9 @@ export class SymphonyDexProvider {
       });
       clearTimeout(timeoutId);
       return response;
-    } catch (error) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
         throw new Error(`Request timeout after ${this.config.timeout}ms`);
       }
       throw error;
@@ -138,9 +138,10 @@ export class SymphonyDexProvider {
         exchange: 'symphony'
       };
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Symphony quote error:', error);
-      throw new Error(`Failed to get Symphony quote: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get Symphony quote: ${errorMessage}`);
     }
   }
 
@@ -185,9 +186,10 @@ export class SymphonyDexProvider {
       const swapData = await response.json();
       return swapData;
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Symphony swap execution error:', error);
-      throw new Error(`Failed to execute Symphony swap: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to execute Symphony swap: ${errorMessage}`);
     }
   }
 
@@ -266,9 +268,10 @@ export class SymphonyDexProvider {
 
       return await response.json();
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Symphony routing error:', error);
-      throw new Error(`Failed to get Symphony route: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get Symphony route: ${errorMessage}`);
     }
   }
 }

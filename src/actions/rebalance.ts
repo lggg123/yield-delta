@@ -276,9 +276,9 @@ export const rebalanceEvaluatorAction: Action = {
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state: State,
-    _options: any,
-    callback: HandlerCallback
+    state?: State,
+    _options?: any,
+    callback?: HandlerCallback
   ) => {
     try {
       elizaLogger.info("Starting portfolio rebalance analysis");
@@ -288,8 +288,7 @@ export const rebalanceEvaluatorAction: Action = {
       
       const walletProvider = new WalletProvider(
         config.SEI_PRIVATE_KEY as `0x${string}`,
-        runtime.cacheManager,
-        { name: config.SEI_NETWORK, chain: seiChains[config.SEI_NETWORK] }
+        { name: config.SEI_NETWORK || "testnet", chain: seiChains[config.SEI_NETWORK || "testnet"] }
       );
 
       const oracleProvider = new SeiOracleProvider(runtime);
@@ -311,14 +310,16 @@ export const rebalanceEvaluatorAction: Action = {
         ? addressMatch[1] 
         : await walletProvider.getAddress();
 
-      callback({
-        text: `🔄 Analyzing portfolio for address: ${walletAddress}\n⏳ Fetching balances and calculating allocations...`,
-        content: {
-          action: "portfolio_analysis_started",
-          address: walletAddress,
-          strategy: strategyName
-        }
-      });
+      if (callback) {
+        callback({
+          text: `🔄 Analyzing portfolio for address: ${walletAddress}\n⏳ Fetching balances and calculating allocations...`,
+          content: {
+            action: "portfolio_analysis_started",
+            address: walletAddress,
+            strategy: strategyName
+          }
+        });
+      }
 
       // Perform portfolio analysis
       const analysis = await rebalancer.analyzePortfolio(walletAddress, strategyName);
@@ -332,83 +333,95 @@ export const rebalanceEvaluatorAction: Action = {
           Math.abs(asset.deviation) > analysis.strategy.rebalanceThreshold
         );
 
-        callback({
-          text: `📊 Portfolio Analysis (${analysis.strategy.name})\n\n` +
-                `💰 Total Value: $${analysis.totalValue.toFixed(2)}\n` +
-                `🎯 Strategy: ${analysis.strategy.description}\n` +
-                `⚖️ Risk Level: ${analysis.strategy.riskLevel}\n\n` +
-                `📈 Asset Allocations:\n` +
-                analysis.assets.map(asset => 
-                  `${asset.symbol}: ${asset.currentPercentage.toFixed(1)}% ` +
-                  `(Target: ${asset.targetPercentage}%, ` +
-                  `Deviation: ${asset.deviation > 0 ? '+' : ''}${asset.deviation.toFixed(1)}%) ` +
-                  `[${asset.recommended.toUpperCase()}${asset.amount ? ` $${asset.amount.toFixed(2)}` : ''}]`
-                ).join('\n') +
-                `\n\n🔧 Rebalance Recommendations:\n` +
-                analysis.recommendations.map(rec => 
-                  `${rec.priority.toUpperCase()}: ${rec.action.toUpperCase()} $${rec.amount.toFixed(2)} ${rec.asset} - ${rec.reason}`
-                ).join('\n'),
-          content: {
-            action: "portfolio_analysis_complete",
-            analysis,
-            needsRebalancing
-          }
-        });
+        if (callback) {
+          callback({
+            text: `📊 Portfolio Analysis (${analysis.strategy.name})\n\n` +
+                  `💰 Total Value: $${analysis.totalValue.toFixed(2)}\n` +
+                  `🎯 Strategy: ${analysis.strategy.description}\n` +
+                  `⚖️ Risk Level: ${analysis.strategy.riskLevel}\n\n` +
+                  `📈 Asset Allocations:\n` +
+                  analysis.assets.map(asset => 
+                    `${asset.symbol}: ${asset.currentPercentage.toFixed(1)}% ` +
+                    `(Target: ${asset.targetPercentage}%, ` +
+                    `Deviation: ${asset.deviation > 0 ? '+' : ''}${asset.deviation.toFixed(1)}%) ` +
+                    `[${asset.recommended.toUpperCase()}${asset.amount ? ` $${asset.amount.toFixed(2)}` : ''}]`
+                  ).join('\n') +
+                  `\n\n🔧 Rebalance Recommendations:\n` +
+                  analysis.recommendations.map(rec => 
+                    `${rec.priority.toUpperCase()}: ${rec.action.toUpperCase()} $${rec.amount.toFixed(2)} ${rec.asset} - ${rec.reason}`
+                  ).join('\n'),
+            content: {
+              action: "portfolio_analysis_complete",
+              analysis,
+              needsRebalancing
+            }
+          });
+        }
 
         if (autoExecute) {
-          callback({
-            text: `🔄 Executing rebalance recommendations...`,
-            content: { action: "rebalance_execution_started" }
-          });
+          if (callback) {
+            callback({
+              text: `🔄 Executing rebalance recommendations...`,
+              content: { action: "rebalance_execution_started" }
+            });
+          }
 
           const txHashes = await rebalancer.executeRebalance(walletAddress, analysis.recommendations);
 
-          callback({
-            text: `✅ Portfolio rebalance complete!\n\n` +
-                  `📝 Executed ${txHashes.length} transactions:\n` +
-                  txHashes.map((hash, i) => `${i + 1}. ${hash}`).join('\n'),
-            content: {
-              action: "rebalance_execution_complete",
-              transactions: txHashes,
-              analysis
-            }
-          });
+          if (callback) {
+            callback({
+              text: `✅ Portfolio rebalance complete!\n\n` +
+                    `📝 Executed ${txHashes.length} transactions:\n` +
+                    txHashes.map((hash, i) => `${i + 1}. ${hash}`).join('\n'),
+              content: {
+                action: "rebalance_execution_complete",
+                transactions: txHashes,
+                analysis
+              }
+            });
+          }
         } else {
+          if (callback) {
+            callback({
+              text: `💡 To execute these recommendations, send: "rebalance portfolio execute"`,
+              content: {
+                action: "rebalance_recommendations_ready",
+                analysis
+              }
+            });
+          }
+        }
+      } else {
+        if (callback) {
           callback({
-            text: `💡 To execute these recommendations, send: "rebalance portfolio execute"`,
+            text: `✅ Portfolio is well-balanced!\n\n` +
+                  `📊 Current allocations are within target ranges for the ${analysis.strategy.name} strategy.\n` +
+                  `💰 Total Value: $${analysis.totalValue.toFixed(2)}\n\n` +
+                  `📈 Asset Allocations:\n` +
+                  analysis.assets.map(asset => 
+                    `${asset.symbol}: ${asset.currentPercentage.toFixed(1)}% ` +
+                    `(Target: ${asset.targetPercentage}%, ` +
+                    `Deviation: ${asset.deviation > 0 ? '+' : ''}${asset.deviation.toFixed(1)}%)`
+                  ).join('\n'),
             content: {
-              action: "rebalance_recommendations_ready",
+              action: "portfolio_balanced",
               analysis
             }
           });
         }
-      } else {
-        callback({
-          text: `✅ Portfolio is well-balanced!\n\n` +
-                `📊 Current allocations are within target ranges for the ${analysis.strategy.name} strategy.\n` +
-                `💰 Total Value: $${analysis.totalValue.toFixed(2)}\n\n` +
-                `📈 Asset Allocations:\n` +
-                analysis.assets.map(asset => 
-                  `${asset.symbol}: ${asset.currentPercentage.toFixed(1)}% ` +
-                  `(Target: ${asset.targetPercentage}%, ` +
-                  `Deviation: ${asset.deviation > 0 ? '+' : ''}${asset.deviation.toFixed(1)}%)`
-                ).join('\n'),
-          content: {
-            action: "portfolio_balanced",
-            analysis
-          }
-        });
       }
 
     } catch (error) {
       elizaLogger.error("Portfolio rebalance analysis failed:", error);
-      callback({
-        text: `❌ Portfolio analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        content: { 
-          action: "rebalance_failed", 
-          error: error instanceof Error ? error.message : 'Unknown error' 
-        }
-      });
+      if (callback) {
+        callback({
+          text: `❌ Portfolio analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          content: { 
+            action: "rebalance_failed", 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          }
+        });
+      }
     }
   },
   examples: [

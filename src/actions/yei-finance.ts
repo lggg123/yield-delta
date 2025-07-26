@@ -43,10 +43,10 @@ export const yeiFinanceAction: Action = {
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state: State,
-    _options: { [key: string]: unknown },
+    state?: State,
+    _options?: { [key: string]: unknown },
     callback?: HandlerCallback
-  ): Promise<boolean> => {
+  ): Promise<void> => {
     try {
       const config = validateSeiConfig(runtime);
       const oracle = new SeiOracleProvider(runtime);
@@ -125,7 +125,6 @@ Ask about specific lending rates, oracle prices, or collateral requirements!`;
         });
       }
 
-      return true;
     } catch (error) {
       console.error("Error in YEI Finance action:", error);
       
@@ -133,13 +132,11 @@ Ask about specific lending rates, oracle prices, or collateral requirements!`;
         callback({
           text: "I encountered an error fetching YEI Finance information. Please try again.",
           content: { 
-            error: error.message,
+            error: error instanceof Error ? error.message : 'Unknown error',
             action: 'YEI_FINANCE'
           }
         });
       }
-      
-      return false;
     }
   },
   examples: [

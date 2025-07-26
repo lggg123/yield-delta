@@ -42,24 +42,34 @@ export class DexAggregator {
     // Get DragonSwap quote
     try {
       const dragonQuote = await this.dragonSwap.getQuote(tokenIn, tokenOut, amountIn);
-      quotes.push({
-        exchange: 'dragonswap',
-        amountIn,
-        amountOut: dragonQuote.amountOut,
-        priceImpact: (dragonQuote.priceImpact || 0).toString(),
-        gasEstimate: dragonQuote.gasEstimate || "200000",
-        route: dragonQuote.route || []
-      });
-    } catch (error) {
-      errors.push(`DragonSwap: ${error.message}`);
+      if (dragonQuote && dragonQuote.amountOut) {
+        quotes.push({
+          exchange: 'dragonswap',
+          amountIn,
+          amountOut: dragonQuote.amountOut,
+          priceImpact: (dragonQuote.priceImpact || 0).toString(),
+          gasEstimate: dragonQuote.gasEstimate || "200000",
+          route: dragonQuote.route || []
+        });
+      } else {
+        errors.push('DragonSwap: Invalid quote response');
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      errors.push(`DragonSwap: ${errorMessage}`);
     }
 
     // Get Symphony quote
     try {
       const symphonyQuote = await this.symphony.getQuote(tokenIn, tokenOut, amountIn);
-      quotes.push(symphonyQuote);
-    } catch (error) {
-      errors.push(`Symphony: ${error.message}`);
+      if (symphonyQuote && symphonyQuote.amountOut) {
+        quotes.push(symphonyQuote);
+      } else {
+        errors.push('Symphony: Invalid quote response');
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      errors.push(`Symphony: ${errorMessage}`);
     }
 
     if (quotes.length === 0) {

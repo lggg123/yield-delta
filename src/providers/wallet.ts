@@ -38,9 +38,9 @@ type ViemWalletClient = ReturnType<typeof createWalletClient>;
 export class WalletProvider {
     private cache: NodeCache;
     private cacheKey = "evm/wallet";
-    private currentChain: ChainWithName;
+    private currentChain!: ChainWithName;
     private CACHE_EXPIRY_SEC = 5;
-    account: PrivateKeyAccount;
+    account!: PrivateKeyAccount;
 
     constructor(
         accountOrPrivateKey: PrivateKeyAccount | `0x${string}`,
@@ -62,33 +62,33 @@ export class WalletProvider {
         return this.currentChain;
     }
 
-    getPublicClient(): ViemPublicClient {
+    getPublicClient(): any {
         const transport = this.createHttpTransport();
 
         return createPublicClient({
             chain: this.currentChain.chain,
             transport,
-        });
+        }) as any;
     }
 
     // Fix: Use simple WalletClient type without complex generics
-    getEvmWalletClient(): ViemWalletClient {
+    getEvmWalletClient(): any {
         const transport = this.createHttpTransport();
 
         return createWalletClient({
             chain: this.currentChain.chain,
             transport,
             account: this.account,
-        });
+        }) as any;
     }
 
-    getEvmPublicClient(): ViemPublicClient {
+    getEvmPublicClient(): any {
         const transport = this.createHttpTransport();
 
         return createPublicClient({
             chain: this.currentChain.chain,
             transport: transport,
-        });
+        }) as any;
     }
 
     async getWalletBalance(): Promise<string | null> {

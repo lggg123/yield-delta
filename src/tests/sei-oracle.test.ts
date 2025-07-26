@@ -4,7 +4,9 @@ import { createPublicClient } from 'viem';
 
 // Import test helpers
 import { 
-  createMockRuntime
+  createMockRuntime,
+  createMockMemory,
+  createMockState
 } from './test-helpers';
 
 // Mock dependencies
@@ -80,7 +82,9 @@ describe('SeiOracleProvider', () => {
     });
 
     it('should provide context for the provider', async () => {
-      const context = await oracleProvider.get(mockRuntime, {}, {});
+      const mockMemory = createMockMemory('test oracle context');
+      const mockState = createMockState();
+      const context = await oracleProvider.get(mockRuntime, mockMemory, mockState);
       expect(context).toContain('price data');
       expect(context).toContain('SEI blockchain');
     });

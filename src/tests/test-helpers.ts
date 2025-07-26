@@ -24,7 +24,8 @@ if (!process.env.ORACLE_API_KEY) {
 
 // Helper function to generate proper UUID format with correct typing
 function generateMockUUID(): UUID {
-  return randomUUID() as UUID;
+  const uuid = randomUUID();
+  return uuid as UUID;
 }
 
 // Mock viem to prevent actual blockchain calls
@@ -112,12 +113,11 @@ vi.mock('viem', async () => {
   };
 });
 
-export function createMockMemory(text: string, entityId?: string): Memory {
+export function createMockMemory(text: string, entityId?: UUID): Memory {
   return {
     id: generateMockUUID(),
     entityId: entityId || generateMockUUID(),
     roomId: generateMockUUID(),
-    userId: generateMockUUID(),
     agentId: generateMockUUID(),
     createdAt: Date.now(),
     content: {
@@ -135,7 +135,6 @@ export const createMockMessage = createMockMemory;
 
 export function createMockState(): State {
   return {
-    userId: generateMockUUID(),
     agentId: generateMockUUID(),
     roomId: generateMockUUID(),
     bio: 'Test agent bio',

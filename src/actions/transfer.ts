@@ -20,16 +20,6 @@ import { ADDRESS_PRECOMPILE_ABI, ADDRESS_PRECOMPILE_ADDRESS, ChainWithName } fro
 import { sei, seiTestnet } from "viem/chains";
 
 // Create simplified interfaces to avoid deep type instantiation
-interface SimpleTransferParams {
-    amount: string;
-    toAddress: string;
-}
-
-interface SimpleTransferResponse {
-    hash: string;
-    to: string;
-}
-
 interface TransferParams {
     amount: string;
     toAddress: string;
@@ -120,8 +110,10 @@ export class TransferAction {
 
                 elizaLogger.log(`Translated address ${params.toAddress} to EVM address ${evmAddress}`);
                 recipientAddress = evmAddress as `0x${string}`;
-            } catch (error) {
-                throw new Error(`Failed to translate SEI address: ${error.message}`);
+            } catch (error: unknown) {
+                // Fix the error handling here
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                throw new Error(`Failed to translate SEI address: ${errorMessage}`);
             }
         } else {
             // Handle EVM address
@@ -165,9 +157,11 @@ export class TransferAction {
                 data: (params.data as Hex) || '0x',
             };
 
-        } catch (error) {
-            elizaLogger.error(`Transfer failed: ${error.message}`);
-            throw new Error(`Transfer failed: ${error.message}`);
+        } catch (error: unknown) {
+            // Fix the error handling here too
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            elizaLogger.error(`Transfer failed: ${errorMessage}`);
+            throw new Error(`Transfer failed: ${errorMessage}`);
         }
     }
 
@@ -235,8 +229,10 @@ export class TransferAction {
             });
 
             return gasEstimate;
-        } catch (error) {
-            elizaLogger.error(`Gas estimation failed: ${error.message}`);
+        } catch (error: unknown) {
+            // Fix the error handling here as well
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            elizaLogger.error(`Gas estimation failed: ${errorMessage}`);
             // Return a conservative estimate if estimation fails
             return BigInt(21000);
         }
@@ -259,14 +255,20 @@ export const transferAction: Action = {
                 return false;
             }
 
-            const text = message.content.text.toLowerCase();
+            // Safe text access with optional chaining
+            const text = message?.content?.text?.toLowerCase() || "";
+            if (!text) {
+                return false;
+            }
+
             return (
                 (text.includes("transfer") || text.includes("send") || text.includes("move")) &&
                 (text.includes("sei") || text.includes("token")) &&
                 (text.includes("0x") || text.includes("sei1"))
             );
-        } catch (error) {
-            elizaLogger.error("Transfer validation error:", error);
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            elizaLogger.error("Transfer validation error:", errorMessage);
             return false;
         }
     },
@@ -274,18 +276,20 @@ export const transferAction: Action = {
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
-        state: State,
-        _options: any, // Use any instead of complex Record type
-        callback?: any // Simplify callback type
+        state?: State, // Make state optional
+        _options?: any, // Also make options optional for consistency
+        callback?: any
     ): Promise<void> => {
-        elizaLogger.debug("Transfer action handler called");
-        
         try {
-            // Build transfer parameters
-            const params = await buildTransferDetails(message, runtime);
+            elizaLogger.log("Starting token transfer...");
             
+            // Safe parameter building with comprehensive error handling
+            const params = await buildTransferDetails(message, runtime);
             const walletProvider = await initWalletProvider(runtime);
             const action = new TransferAction(walletProvider);
+
+            // Validate parameters before transfer
+            action.validateParams(params);
 
             const transferResp = await action.transfer(params);
             
@@ -299,7 +303,6 @@ export const transferAction: Action = {
                 
                 const successMessage = `✅ Successfully transferred ${amount} SEI to ${toAddress}\n\n📄 Transaction Hash: ${hash}\n🔗 Chain: ${chainName}`;
                 
-                // Create simple response object
                 const response = {
                     text: successMessage,
                     content: {
@@ -315,8 +318,8 @@ export const transferAction: Action = {
             }
             
         } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            elizaLogger.error("Error during token transfer:", error);
+            const errorMessage = getErrorMessage(error);
+            elizaLogger.error("Error during token transfer:", errorMessage);
             
             if (callback) {
                 const errorResponse = {
@@ -364,25 +367,62 @@ export const transferAction: Action = {
     ],
 };
 
-// Simplified helper functions
-async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Promise<TransferParams> {
-    // Use optional chaining with fallback
-    const messageText = message?.content?.text ?? "";
-    
-    if (!messageText.trim()) {
-        throw new Error("Invalid message: empty or missing text content");
+// Helper function for safe error message extraction
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
     }
-
-    const params = parseTransferParams(messageText);
-    
-    if (!params) {
-        throw new Error("Could not parse transfer parameters. Please specify amount and recipient address.\n\nExample: 'Send 100 SEI to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e'");
+    if (typeof error === 'string') {
+        return error;
     }
-    
-    return params;
+    return 'Unknown error occurred';
 }
 
-function parseTransferParams(text: string): SimpleTransferParams | null {
+// Safe message text extraction
+function getMessageText(message: Memory): string {
+    if (!message || !message.content) {
+        throw new Error("Invalid message: missing content");
+    }
+
+    const text = message.content.text;
+    if (!text || typeof text !== 'string') {
+        throw new Error("Invalid message: missing or invalid text content");
+    }
+
+    return text.trim();
+}
+
+// Updated buildTransferDetails function
+async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Promise<TransferParams> {
+    try {
+        // Safe text extraction with proper error handling
+        const messageText = getMessageText(message);
+        
+        if (!messageText) {
+            throw new Error("Empty message text");
+        }
+
+        const params = parseTransferParams(messageText);
+        
+        if (!params) {
+            throw new Error("Could not parse transfer parameters. Please specify amount and recipient address.\n\nExample: 'Send 100 SEI to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e'");
+        }
+        
+        return params;
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
+        elizaLogger.error("Failed to build transfer details:", errorMessage);
+        throw new Error(`Transfer parameter parsing failed: ${errorMessage}`);
+    }
+}
+
+// Enhanced parseTransferParams with better validation
+function parseTransferParams(text: string): TransferParams | null {
+    // Ensure text is valid
+    if (!text || typeof text !== 'string' || !text.trim()) {
+        return null;
+    }
+
     // Extract amount and address using regex
     const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:SEI|sei)/i);
     const addressMatch = text.match(/(0x[a-fA-F0-9]{40}|sei1[a-z0-9]{38})/);
@@ -395,6 +435,31 @@ function parseTransferParams(text: string): SimpleTransferParams | null {
         amount: amountMatch[1],
         toAddress: addressMatch[1]
     };
+}
+
+// Update your initWalletProvider function
+async function initWalletProvider(runtime: IAgentRuntime): Promise<WalletProvider> {
+    try {
+        const privateKey = runtime.getSetting("SEI_PRIVATE_KEY");
+        const network = runtime.getSetting("SEI_NETWORK") || "testnet";
+        
+        if (!privateKey) {
+            throw new Error("SEI_PRIVATE_KEY is required");
+        }
+        
+        if (!privateKey.startsWith("0x")) {
+            throw new Error("SEI_PRIVATE_KEY must start with '0x'");
+        }
+
+        elizaLogger.debug(`Initializing wallet provider for network: ${network}`);
+        const chainWithName = createChainWithName(network);
+        
+        return new WalletProvider(privateKey as `0x${string}`, chainWithName);
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
+        elizaLogger.error("Failed to initialize wallet provider:", errorMessage);
+        throw new Error(`Wallet provider initialization failed: ${errorMessage}`);
+    }
 }
 
 // Define configuration with type assertions upfront
@@ -421,19 +486,4 @@ class ChainConfigFactory {
 
 function createChainWithName(network: string): ChainWithName {
     return ChainConfigFactory.create(network);
-}
-
-// Update your initWalletProvider function
-async function initWalletProvider(runtime: IAgentRuntime): Promise<WalletProvider> {
-    const privateKey = runtime.getSetting("SEI_PRIVATE_KEY");
-    const network = runtime.getSetting("SEI_NETWORK") || "testnet";
-    
-    if (!privateKey || !privateKey.startsWith("0x")) {
-        throw new Error("Invalid or missing SEI_PRIVATE_KEY");
-    }
-
-    // Create the proper ChainWithName object
-    const chainWithName = createChainWithName(network);
-    
-    return new WalletProvider(privateKey as `0x${string}`, chainWithName);
 }

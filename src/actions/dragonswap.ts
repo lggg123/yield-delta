@@ -28,12 +28,9 @@ const swapRouterAbi = [
   }
 ] as const;
 
-export interface DragonSwapTradeParams {
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: string;
-  minAmountOut: string;
-  slippage?: number; // in basis points (100 = 1%)
+interface QuoteResult {
+  amountOut: string;
+  priceImpact: number;
 }
 
 export interface DragonSwapPoolInfo {
@@ -43,6 +40,22 @@ export interface DragonSwapPoolInfo {
   fee: number;
   liquidity: string;
   price: string;
+}
+
+interface TradeParams {
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    slippage?: string; // Keep as string for parsing
+    minAmountOut?: string;
+}
+
+interface DragonSwapTradeParams {
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minAmountOut: string;
+    slippage?: number; // Number for API
 }
 
 class DragonSwapAPI {
@@ -293,138 +306,264 @@ class DragonSwapAPI {
   }
 }
 
-export const dragonSwapTradeAction: Action = {
-  name: "DRAGONSWAP_TRADE",
-  similes: [
-    "SWAP_ON_DRAGONSWAP",
-    "TRADE_DRAGONSWAP",
-    "EXCHANGE_TOKENS",
-    "SWAP_SEI_TOKENS"
-  ],
-  validate: async (runtime: IAgentRuntime, message: Memory) => {
-    const config = await validateSeiConfig(runtime);
-    
-    // Check if message contains trade intent
-    const text = message.content.text.toLowerCase();
-    return (
-      (text.includes("swap") || text.includes("trade") || text.includes("exchange")) &&
-      (text.includes("dragonswap") || text.includes("dragon")) &&
-      (text.includes("sei") || text.includes("token"))
-    );
-  },
-
-  description: "Execute token swaps on DragonSwap DEX on Sei Network",
-
-  handler: async (
-    runtime: IAgentRuntime,
-    message: Memory,
-    state: State,
-    _options: any,
-    callback: HandlerCallback
-  ) => {
-    elizaLogger.log("Processing DragonSwap trade request");
-
-    try {
-      const config = await validateSeiConfig(runtime);
-      
-      const walletProvider = new WalletProvider(
-        config.SEI_PRIVATE_KEY as `0x${string}`,
-        runtime.cacheManager,
-        { name: config.SEI_NETWORK, chain: seiChains[config.SEI_NETWORK] }
-      );
-
-      const dragonSwap = new DragonSwapAPI(
-        walletProvider, 
-        config.SEI_NETWORK !== "mainnet"
-      );
-
-      // Parse trade parameters from message
-      const tradeParams = await parseTradeParams(message.content.text);
-      if (!tradeParams) {
-        callback({
-          text: "I couldn't understand the trade parameters. Please specify tokens and amounts. Example: 'Swap 10 SEI for USDC on DragonSwap'",
-          error: true
-        });
-        return;
-      }
-
-      // Get current pool info and quote
-      const poolInfo = await dragonSwap.getPoolInfo(tradeParams.tokenIn, tradeParams.tokenOut);
-      if (!poolInfo) {
-        callback({
-          text: `No liquidity pool found for ${tradeParams.tokenIn}/${tradeParams.tokenOut} on DragonSwap`,
-          error: true
-        });
-        return;
-      }
-
-      const quote = await dragonSwap.getQuote(
-        tradeParams.tokenIn, 
-        tradeParams.tokenOut, 
-        tradeParams.amountIn
-      );
-
-      if (!quote) {
-        callback({
-          text: "Could not get price quote for this trade",
-          error: true
-        });
-        return;
-      }
-
-      // Check wallet balance before executing swap
-      const balance = await walletProvider.getWalletBalance();
-      const requiredAmount = parseFloat(tradeParams.amountIn);
-      const availableBalance = parseFloat(balance);
-      
-      if (availableBalance < requiredAmount) {
-        callback({
-          text: `Failed to execute swap: Insufficient balance. Required: ${requiredAmount} ${tradeParams.tokenIn}, Available: ${availableBalance} ${tradeParams.tokenIn}`,
-          error: true
-        });
-        return;
-      }
-
-      // Check for high price impact and warn user
-      const priceImpactPercent = quote.priceImpact * 100; // Convert to percentage
-      if (priceImpactPercent > 10.0) {
-        callback({
-          text: `⚠️ High Price Impact Warning: ${priceImpactPercent.toFixed(2)}%\nThis trade will significantly impact the token price. Consider reducing the trade size.`,
-        });
-      } else if (priceImpactPercent > 5.0) {
-        callback({
-          text: `Price Impact: ${priceImpactPercent.toFixed(2)}% - Moderate impact detected.`,
-        });
-      }
-
-      // Execute the swap
-      const txHash = await dragonSwap.executeSwap({
-        ...tradeParams,
-        minAmountOut: quote.amountOut
-      }, quote);
-
-      if (txHash) {
-        const priceImpactPercent = quote.priceImpact * 100;
-        callback({
-          text: `✅ Successfully swapped ${tradeParams.amountIn} ${tradeParams.tokenIn} for ~${quote.amountOut} ${tradeParams.tokenOut}\n` +
-                `Transaction: ${txHash}\n` +
-                `Price Impact: ${priceImpactPercent.toFixed(2)}%`,
-        });
-      } else {
-        callback({
-          text: "Failed to execute swap. Please try again later.",
-          error: true
-        });
-      }
-
-    } catch (error) {
-      elizaLogger.error("DragonSwap trade error:", error);
-      callback({
-        text: `Error executing trade: ${error.message}`,
-        error: true
-      });
+// Helper function for safe error message extraction
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
     }
-  },
+    if (typeof error === 'string') {
+        return error;
+    }
+    return 'Unknown error occurred';
+}
+
+// Safe message text extraction
+function getMessageText(message: Memory): string {
+    if (!message || !message.content) {
+        throw new Error("Invalid message: missing content");
+    }
+
+    const text = message.content.text;
+    if (!text || typeof text !== 'string') {
+        throw new Error("Invalid message: missing or invalid text content");
+    }
+
+    return text.trim();
+}
+
+// Updated parseTradeParams to handle undefined text
+async function parseTradeParams(text: string | undefined): Promise<TradeParams | null> {
+    if (!text || typeof text !== 'string' || !text.trim()) {
+        return null;
+    }
+
+    // Your existing parsing logic here
+    // Example implementation:
+    const tokenMatch = text.match(/swap\s+(\d+(?:\.\d+)?)\s+(\w+)\s+for\s+(\w+)/i);
+    if (!tokenMatch) {
+        return null;
+    }
+
+    return {
+        tokenIn: tokenMatch[2].toUpperCase(),
+        tokenOut: tokenMatch[3].toUpperCase(),
+        amountIn: tokenMatch[1],
+        slippage: "0.5" // default slippage
+    };
+}
+
+// Validation and conversion function
+function validateAndConvertTradeParams(
+    tradeParams: TradeParams, 
+    quote: QuoteResult
+): DragonSwapTradeParams {
+    // Validate required fields
+    if (!tradeParams.tokenIn || !tradeParams.tokenOut || !tradeParams.amountIn) {
+        throw new Error("Missing required trade parameters");
+    }
+
+    // Validate and convert slippage
+    let slippage: number | undefined;
+    if (tradeParams.slippage) {
+        slippage = parseFloat(tradeParams.slippage);
+        if (isNaN(slippage) || slippage < 0 || slippage > 100) {
+            throw new Error("Invalid slippage value. Must be between 0 and 100");
+        }
+    } else {
+        slippage = 0.5; // Default 0.5%
+    }
+
+    return {
+        tokenIn: tradeParams.tokenIn,
+        tokenOut: tradeParams.tokenOut,
+        amountIn: tradeParams.amountIn,
+        minAmountOut: quote.amountOut,
+        slippage
+    };
+}
+
+export const dragonSwapTradeAction: Action = {
+    name: "DRAGONSWAP_TRADE",
+    similes: [
+        "SWAP_ON_DRAGONSWAP",
+        "TRADE_DRAGONSWAP",
+        "EXCHANGE_TOKENS",
+        "SWAP_SEI_TOKENS"
+    ],
+    validate: async (runtime: IAgentRuntime, message: Memory) => {
+        try {
+            const config = await validateSeiConfig(runtime);
+            
+            // Safe text access with optional chaining
+            const text = message?.content?.text?.toLowerCase() || "";
+            if (!text) {
+                return false;
+            }
+
+            return (
+                (text.includes("swap") || text.includes("trade") || text.includes("exchange")) &&
+                (text.includes("dragonswap") || text.includes("dragon")) &&
+                (text.includes("sei") || text.includes("token"))
+            );
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            elizaLogger.error("DragonSwap validation error:", errorMessage);
+            return false;
+        }
+    },
+
+    description: "Execute token swaps on DragonSwap DEX on Sei Network",
+
+    handler: async (
+        runtime: IAgentRuntime,
+        message: Memory,
+        state?: State, // Make state optional
+        _options?: any,
+        callback?: HandlerCallback
+    ): Promise<void> => {
+        elizaLogger.log("Processing DragonSwap trade request");
+
+        try {
+            const config = await validateSeiConfig(runtime);
+            
+            const walletProvider = new WalletProvider(
+                config.SEI_PRIVATE_KEY as `0x${string}`,
+                { name: config.SEI_NETWORK || "testnet", chain: seiChains[config.SEI_NETWORK || "testnet"] }
+            );
+
+            const dragonSwap = new DragonSwapAPI(
+                walletProvider, 
+                config.SEI_NETWORK !== "mainnet"
+            );
+
+            // Safe text extraction with proper error handling
+            let messageText: string;
+            try {
+                messageText = getMessageText(message);
+            } catch (error) {
+                if (callback) {
+                    callback({
+                        text: "Invalid message format. Please provide trade details.",
+                        error: true
+                    });
+                }
+                return;
+            }
+
+            // Parse trade parameters from message
+            const tradeParams = await parseTradeParams(messageText);
+            if (!tradeParams) {
+                if (callback) {
+                    callback({
+                        text: "I couldn't understand the trade parameters. Please specify tokens and amounts. Example: 'Swap 10 SEI for USDC on DragonSwap'",
+                        error: true
+                    });
+                }
+                return;
+            }
+
+            // Get current pool info and quote
+            const poolInfo = await dragonSwap.getPoolInfo(tradeParams.tokenIn, tradeParams.tokenOut);
+            if (!poolInfo) {
+                if (callback) {
+                    callback({
+                        text: `No liquidity pool found for ${tradeParams.tokenIn}/${tradeParams.tokenOut} on DragonSwap`,
+                        error: true
+                    });
+                }
+                return;
+            }
+
+            const quote = await dragonSwap.getQuote(
+                tradeParams.tokenIn, 
+                tradeParams.tokenOut, 
+                tradeParams.amountIn
+            );
+
+            if (!quote) {
+                if (callback) {
+                    callback({
+                        text: "Could not get price quote for this trade",
+                        error: true
+                    });
+                }
+                return;
+            }
+
+            // Check wallet balance before executing swap
+            const balance = await walletProvider.getWalletBalance();
+            if (!balance) {
+                if (callback) {
+                    callback({
+                        text: "Failed to retrieve wallet balance. Please try again later.",
+                        error: true
+                    });
+                }
+                return;
+            }
+            const requiredAmount = parseFloat(tradeParams.amountIn);
+            const availableBalance = parseFloat(balance);
+            
+            if (availableBalance < requiredAmount) {
+                if (callback) {
+                    callback({
+                        text: `Failed to execute swap: Insufficient balance. Required: ${requiredAmount} ${tradeParams.tokenIn}, Available: ${availableBalance} ${tradeParams.tokenIn}`,
+                        error: true
+                    });
+                }
+                return;
+            }
+
+            // Check for high price impact and warn user
+            const priceImpactPercent = quote.priceImpact * 100;
+            if (priceImpactPercent > 10.0) {
+                if (callback) {
+                    callback({
+                        text: `⚠️ High Price Impact Warning: ${priceImpactPercent.toFixed(2)}%\nThis trade will significantly impact the token price. Consider reducing the trade size.`,
+                    });
+                }
+            } else if (priceImpactPercent > 5.0) {
+                if (callback) {
+                    callback({
+                        text: `Price Impact: ${priceImpactPercent.toFixed(2)}% - Moderate impact detected.`,
+                    });
+                }
+            }
+
+            // Convert and validate parameters before swap
+            const dragonSwapParams = validateAndConvertTradeParams(tradeParams, quote);
+
+            // Execute the swap
+            const txHash = await dragonSwap.executeSwap(dragonSwapParams, quote);
+
+            if (callback) {
+                if (txHash) {
+                    const priceImpactPercent = quote.priceImpact * 100;
+                    callback({
+                        text: `✅ Successfully swapped ${tradeParams.amountIn} ${tradeParams.tokenIn} for ~${quote.amountOut} ${tradeParams.tokenOut}\n` +
+                              `Transaction: ${txHash}\n` +
+                              `Price Impact: ${priceImpactPercent.toFixed(2)}%`,
+                    });
+                } else {
+                    callback({
+                        text: "Failed to execute swap. Please try again later.",
+                        error: true
+                    });
+                }
+            }
+
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            elizaLogger.error("DragonSwap trade error:", errorMessage);
+            
+            if (callback) {
+                callback({
+                    text: `Error executing trade: ${errorMessage}`,
+                    error: true
+                });
+            }
+        }
+    },
 
   examples: [
     [
@@ -455,23 +594,3 @@ export const dragonSwapTradeAction: Action = {
     ]
   ]
 };
-
-// Helper function to parse trade parameters from natural language
-async function parseTradeParams(text: string): Promise<DragonSwapTradeParams | null> {
-  const lowerText = text.toLowerCase();
-
-  // Extract amount and tokens using regex patterns
-  const amountMatch = lowerText.match(/(?:swap|trade|exchange)\s+(\d+(?:.\d+)?)\s+(\w+)/);
-  const forTokenMatch = lowerText.match(/for\s+(\w+)/);
-  const slippageMatch = lowerText.match(/(\d+(?:.\d+)?)\s*%\s*slippage/);
-
-  if (!amountMatch || !forTokenMatch) return null;
-
-  return {
-    tokenIn: amountMatch[2].toUpperCase(),
-    tokenOut: forTokenMatch[1].toUpperCase(),
-    amountIn: amountMatch[1],
-    minAmountOut: "0", // Will be calculated from quote
-    slippage: slippageMatch ? parseFloat(slippageMatch[1]) * 100 : 100 // 1% default
-  };
-}
