@@ -365,12 +365,18 @@ export const transferAction: Action = {
 };
 
 // Simplified helper functions
-async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Promise<SimpleTransferParams> {
-    const messageText = message.content?.text || "";
+async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Promise<TransferParams> {
+    // Use optional chaining with fallback
+    const messageText = message?.content?.text ?? "";
+    
+    if (!messageText.trim()) {
+        throw new Error("Invalid message: empty or missing text content");
+    }
+
     const params = parseTransferParams(messageText);
     
     if (!params) {
-        throw new Error("Could not parse transfer parameters. Please specify amount and recipient address.");
+        throw new Error("Could not parse transfer parameters. Please specify amount and recipient address.\n\nExample: 'Send 100 SEI to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e'");
     }
     
     return params;
@@ -391,29 +397,30 @@ function parseTransferParams(text: string): SimpleTransferParams | null {
     };
 }
 
-// Helper function to create ChainWithName from network string
-function createChainWithName(network: string): ChainWithName {
-    let chain;
-    let name;
+// Define configuration with type assertions upfront
+class ChainConfigFactory {
+    private static configs = new Map([
+        ['mainnet', { name: 'sei-mainnet', chain: sei }],
+        ['testnet', { name: 'sei-testnet', chain: seiTestnet }],
+        ['atlantic-2', { name: 'sei-testnet', chain: seiTestnet }]
+    ]);
 
-    switch (network.toLowerCase()) {
-        case 'mainnet':
-            chain = sei;
-            name = 'sei-mainnet';
-            break;
-        case 'testnet':
-        case 'atlantic-2':
-            chain = seiTestnet;
-            name = 'sei-testnet';
-            break;
-        default:
-            throw new Error(`Unsupported network: ${network}`);
+    static create(network: string): ChainWithName {
+        const config = this.configs.get(network.toLowerCase());
+        
+        if (!config) {
+            throw new Error(`Unsupported network: ${network}. Supported: ${Array.from(this.configs.keys()).join(', ')}`);
+        }
+        
+        return {
+            name: config.name,
+            chain: config.chain as any // Type assertion
+        };
     }
+}
 
-    return {
-        name,
-        chain
-    };
+function createChainWithName(network: string): ChainWithName {
+    return ChainConfigFactory.create(network);
 }
 
 // Update your initWalletProvider function

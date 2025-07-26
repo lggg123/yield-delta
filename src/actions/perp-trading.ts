@@ -308,11 +308,11 @@ export const perpsTradeAction: Action = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Open long BTC 1000 2x" }
       },
       {
-        user: "{{agentName}}",
+        name: "{{agentName}}",
         content: {
           text: "Opening long BTC position with $1000 at 2x leverage...",
           action: "PERPS_TRADE"

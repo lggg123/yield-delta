@@ -17,7 +17,7 @@ const _SupportedChainList = Object.keys([viemChains.seiDevnet, viemChains.seiTes
 
 export interface ChainWithName {
     name: string;
-    chain: Chain
+    chain: any
 }
 
 // Transaction types
