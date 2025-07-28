@@ -46,7 +46,7 @@ describe('Transfer Action', () => {
 
   describe('Constructor', () => {
     it('should initialize with correct properties', () => {
-      expect(transferAction.name).toBe('transfer');
+      expect(transferAction.name).toBe('TRANSFER_TOKENS');
       expect(transferAction.description).toContain('Transfer');
       expect(transferAction.similes).toContain('SEND_TOKENS');
     });

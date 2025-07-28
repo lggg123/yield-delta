@@ -38,7 +38,7 @@ describe('Funding Arbitrage Action', () => {
     it('should have correct action properties', () => {
       expect(fundingArbitrageAction.name).toBe('FUNDING_ARBITRAGE');
       expect(fundingArbitrageAction.description).toContain('funding rate arbitrage');
-      expect(fundingArbitrageAction.similes).toContain('ARBITRAGE_FUNDING');
+      expect(fundingArbitrageAction.similes).toContain('ARBITRAGE');
     });
 
     it('should validate funding arbitrage messages correctly', async () => {
