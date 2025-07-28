@@ -9,6 +9,7 @@ import { fundingArbitrageAction } from "./actions/funding-arbitrage";
 import { perpsTradeAction } from "./actions/perp-trading";
 import { rebalanceEvaluatorAction } from "./actions/rebalance";
 import { yeiFinanceAction } from './actions/yei-finance';
+import { ilProtectionAction } from "./actions/il-protection";
 
 // Import utilities and types from environment
 import { 
@@ -25,14 +26,15 @@ console.log("SEI YIELD-DELTA PLUGIN IS BEING INITIALIZED");
 
 export const seiYieldDeltaPlugin: Plugin = {
     name: "sei-yield-delta",
-    description: "Advanced DeFi yield optimization and arbitrage strategies for SEI blockchain",
+    description: "Advanced DeFi yield optimization and arbitrage strategies for SEI blockchain with IL protection",
     actions: [
         transferAction,
         dragonSwapTradeAction,
         fundingArbitrageAction,
         perpsTradeAction,
         rebalanceEvaluatorAction,
-        yeiFinanceAction
+        yeiFinanceAction,
+        ilProtectionAction
     ],
     evaluators: [],
     providers: [
@@ -48,7 +50,8 @@ export {
     fundingArbitrageAction,
     perpsTradeAction,
     rebalanceEvaluatorAction,
-    yeiFinanceAction
+    yeiFinanceAction,
+    ilProtectionAction
 };
 
 // Export providers

@@ -15,7 +15,10 @@ describe('Perps Trading Action', () => {
     mockRuntime = {
       getSetting: vi.fn((key: string) => {
         if (key === 'SEI_PRIVATE_KEY') return '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
-        if (key === 'SEI_NETWORK') return 'testnet';
+        if (key === 'SEI_NETWORK') return 'sei-testnet';
+        if (key === 'PERP_PROTOCOL') return 'vortex';
+        if (key === 'VORTEX_TESTNET_CONTRACT') return '0x1234567890123456789012345678901234567890';
+        if (key === 'VORTEX_MAINNET_CONTRACT') return '0x9876543210987654321098765432109876543210';
         return null;
       }),
       cacheManager: {
@@ -40,7 +43,7 @@ describe('Perps Trading Action', () => {
 
     // Mock environment variables
     process.env.SEI_PRIVATE_KEY = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
-    process.env.SEI_NETWORK = 'testnet';
+    process.env.SEI_NETWORK = 'sei-testnet';
   });
 
   describe('validation', () => {

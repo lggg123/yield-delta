@@ -44,7 +44,7 @@ describe('Yield Delta Actions Integration Tests', () => {
     
     // Set environment variables as fallback
     process.env.SEI_PRIVATE_KEY = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
-    process.env.SEI_NETWORK = 'testnet';
+    process.env.SEI_NETWORK = 'sei-testnet';
 
     // Mock WalletProvider with comprehensive methods
     mockWalletProvider = {

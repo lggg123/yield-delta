@@ -13,6 +13,10 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'], // 'text' shows summary in terminal
+    },
   },
   define: {
     // Ensure process.env is available

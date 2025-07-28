@@ -123,19 +123,23 @@ describe('Transfer Action', () => {
     });
 
     it('should handle configuration errors gracefully', async () => {
-      // Temporarily remove SEI_PRIVATE_KEY to trigger configuration error
-      const originalKey = process.env.SEI_PRIVATE_KEY;
-      const originalEnv = process.env.NODE_ENV;
-      
-      delete process.env.SEI_PRIVATE_KEY;
-      process.env.NODE_ENV = 'production'; // Trigger validation
+      // Create a mock runtime that returns null for SEI_PRIVATE_KEY
+      const mockRuntimeWithoutKey = {
+        ...mockRuntime,
+        getSetting: vi.fn((key: string) => {
+          if (key === 'SEI_PRIVATE_KEY') {
+            return null; // Simulate missing private key
+          }
+          return mockRuntime.getSetting(key);
+        })
+      };
       
       const mockMessage = createMockMemory('transfer 1 SEI to 0x331fCfeDeA9f3D8138713F4B2FB721C07ef61fD5');
       const mockState = createMockState();
       const mockCallback = createMockCallback();
 
       await transferAction.handler(
-        mockRuntime,
+        mockRuntimeWithoutKey,
         mockMessage,
         mockState,
         {},
@@ -148,16 +152,6 @@ describe('Transfer Action', () => {
                        findCallbackWithText(mockCallback, 'error') ||
                        findCallbackWithText(mockCallback, 'required');
       expect(errorCall).toBeDefined();
-      
-      // Restore environment variables
-      if (originalKey) {
-        process.env.SEI_PRIVATE_KEY = originalKey;
-      }
-      if (originalEnv) {
-        process.env.NODE_ENV = originalEnv;
-      } else {
-        delete process.env.NODE_ENV;
-      }
     });
   });
 });

@@ -16,7 +16,7 @@ beforeAll(() => {
     process.env.SEI_ADDRESS = '0xBFC122e34B01a0875301814958D0f47cA4153d7c';
   }
   if (!process.env.SEI_NETWORK) {
-    process.env.SEI_NETWORK = 'testnet';
+    process.env.SEI_NETWORK = 'sei-testnet';
   }
   if (!process.env.SEI_RPC_URL) {
     process.env.SEI_RPC_URL = 'https://evm-rpc-testnet.sei-apis.com';
@@ -26,6 +26,15 @@ beforeAll(() => {
   }
   if (!process.env.ORACLE_API_KEY) {
     process.env.ORACLE_API_KEY = 'test-oracle-key';
+  }
+  if (!process.env.PERP_PROTOCOL) {
+    process.env.PERP_PROTOCOL = 'vortex';
+  }
+  if (!process.env.VORTEX_TESTNET_CONTRACT) {
+    process.env.VORTEX_TESTNET_CONTRACT = '0x1234567890123456789012345678901234567890';
+  }
+  if (!process.env.VORTEX_MAINNET_CONTRACT) {
+    process.env.VORTEX_MAINNET_CONTRACT = '0x9876543210987654321098765432109876543210';
   }
 
   // Reset all mocks before each test

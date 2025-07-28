@@ -145,7 +145,7 @@ export function createMockRuntime() {
       const fallbacks: Record<string, string> = {
         'SEI_PRIVATE_KEY': '0x41cf748c42faaf463cdfb9eb30adaf699199e3389007e4d8313642cf96236ba6',
         'SEI_ADDRESS': '0xBFC122e34B01a0875301814958D0f47cA4153d7c',
-        'SEI_NETWORK': 'testnet',
+        'SEI_NETWORK': 'sei-testnet',
         'SEI_RPC_URL': 'https://evm-rpc-testnet.sei-apis.com',
         'DRAGONSWAP_API_URL': 'https://api-testnet.dragonswap.app/v1',
         'ORACLE_API_KEY': 'test-oracle-key'
