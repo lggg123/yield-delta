@@ -10,6 +10,9 @@ import { perpsTradeAction } from "./actions/perp-trading";
 import { rebalanceEvaluatorAction } from "./actions/rebalance";
 import { yeiFinanceAction } from './actions/yei-finance';
 import { ilProtectionAction } from "./actions/il-protection";
+import { ammOptimizeAction } from './actions/amm-optimize';
+import { ammRiskEvaluator } from './evaluators/amm-risk';
+import { AMMManagerProvider } from './providers/amm-manager';
 
 // Import utilities and types from environment
 import { 
@@ -34,12 +37,16 @@ export const seiYieldDeltaPlugin: Plugin = {
         perpsTradeAction,
         rebalanceEvaluatorAction,
         yeiFinanceAction,
-        ilProtectionAction
+        ilProtectionAction,
+        ammOptimizeAction
     ],
-    evaluators: [],
+    evaluators: [
+        ammRiskEvaluator
+    ],
     providers: [
         evmWalletProvider as any,
-        oracleProvider as any
+        oracleProvider as any,
+        AMMManagerProvider as any
     ],
 };
 

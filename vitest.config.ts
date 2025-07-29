@@ -15,7 +15,7 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'], // 'text' shows summary in terminal
+      reporter: ['text', 'html'], // Show coverage summary in terminal and generate HTML report
     },
   },
   define: {
