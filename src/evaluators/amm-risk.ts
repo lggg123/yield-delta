@@ -19,17 +19,18 @@ export const ammRiskEvaluator = {
       const riskLevel = (analytics && (analytics.rebalances > 2 || analytics.slippage > 1)) ? 'HIGH' : 'LOW';
       return { symbol, riskLevel, analytics, range: pos.range };
     });
-    callback({ riskReport });
-    return riskReport;
+    const result = { success: true, data: riskReport };
+    if (callback) callback(result);
+    return result;
   },
   examples: [
     {
       prompt: "Evaluate AMM risk for my positions",
       messages: [
-        { name: "user", content: { text: "Evaluate AMM risk for my positions" } },
-        { name: "agent", content: { action: "AMM_RISK_EVALUATOR", text: "AMM risk evaluation complete. Report: ..." } }
+        { name: "{{user1}}", content: { text: "Evaluate AMM risk for my positions" } },
+        { name: "{{agentName}}", content: { action: "AMM_RISK_EVALUATOR", text: "AMM risk evaluation complete. Report: ..." } }
       ],
-      outcome: { riskReport: [{ symbol: "ETH/USDC", riskLevel: "LOW", analytics: { rebalances: 1, slippage: 0.1, fees: 2 }, range: { min: 1800, max: 2200 } }] }
+      outcome: "AMM risk evaluation complete. Report: ..." // ✅ Now a string
     }
   ]
 };
