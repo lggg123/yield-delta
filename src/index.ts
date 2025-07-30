@@ -58,13 +58,15 @@ export {
     perpsTradeAction,
     rebalanceEvaluatorAction,
     yeiFinanceAction,
-    ilProtectionAction
+    ilProtectionAction,
+    ammOptimizeAction
 };
 
 // Export providers
 export {
     evmWalletProvider,
-    oracleProvider
+    oracleProvider,
+    AMMManagerProvider
 };
 
 // Export provider classes

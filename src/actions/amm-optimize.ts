@@ -19,8 +19,8 @@ export const ammOptimizeAction = {
   },
   examples: [
     [
-      { content: { text: 'Optimize my LP positions for ETH/USDC and BTC/USDT' } },
-      { content: { action: 'AMM_OPTIMIZE' } }
+      { name: "{{user1}}", content: { text: 'Optimize my LP positions for ETH/USDC and BTC/USDT' } },
+      { name: "{{agentName}}", content: { action: 'AMM_OPTIMIZE', text: 'AMM optimization complete. Analytics: ...' } }
     ]
   ]
 };

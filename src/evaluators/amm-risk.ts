@@ -23,9 +23,13 @@ export const ammRiskEvaluator = {
     return riskReport;
   },
   examples: [
-    [
-      { content: { text: 'Evaluate AMM risk for my positions' } },
-      { content: { action: 'AMM_RISK_EVALUATOR' } }
-    ]
+    {
+      prompt: "Evaluate AMM risk for my positions",
+      messages: [
+        { name: "user", content: { text: "Evaluate AMM risk for my positions" } },
+        { name: "agent", content: { action: "AMM_RISK_EVALUATOR", text: "AMM risk evaluation complete. Report: ..." } }
+      ],
+      outcome: { riskReport: [{ symbol: "ETH/USDC", riskLevel: "LOW", analytics: { rebalances: 1, slippage: 0.1, fees: 2 }, range: { min: 1800, max: 2200 } }] }
+    }
   ]
 };
