@@ -94,7 +94,7 @@ class DragonSwapAPI {
       }
       return await response.json() as DragonSwapPoolInfo;
     } catch (error) {
-      elizaLogger.error("Failed to get pool info:", error);
+      elizaLogger.error(`Failed to get pool info: ${error}`);
       // In test environment, return mock pool info for errors
       if (process.env.NODE_ENV === 'test') {
         return {
@@ -141,7 +141,7 @@ class DragonSwapAPI {
       }
       return await response.json() as { amountOut: string; priceImpact: number };
     } catch (error) {
-      elizaLogger.error("Failed to get quote:", error);
+      elizaLogger.error(`Failed to get quote: ${error}`);
       // In test environment, return mock quote for errors
       if (process.env.NODE_ENV === 'test') {
         const inputAmount = parseFloat(amountIn);
@@ -221,7 +221,7 @@ class DragonSwapAPI {
       elizaLogger.log(`Swap executed: ${txHash}`);
       return txHash;
     } catch (error) {
-      elizaLogger.error("Failed to execute swap:", error);
+      elizaLogger.error(`Failed to execute swap: ${error}`);
       return null;
     }
   }
@@ -290,7 +290,7 @@ class DragonSwapAPI {
         });
       }
     } catch (error) {
-      elizaLogger.error("Failed to encode swap calldata:", error);
+      elizaLogger.error(`Failed to encode swap calldata: ${error}`);
       throw new Error("Failed to build transaction data");
     }
   }
@@ -352,7 +352,7 @@ class DragonSwapAPI {
       
       return allowance.toString();
     } catch (error) {
-      elizaLogger.error("Failed to check token allowance:", error);
+      elizaLogger.error(`Failed to check token allowance: ${error}`);
       return "0";
     }
   }
@@ -474,7 +474,7 @@ export const dragonSwapTradeAction: Action = {
             );
         } catch (error: unknown) {
             const errorMessage = getErrorMessage(error);
-            elizaLogger.error("DragonSwap validation error:", errorMessage);
+            elizaLogger.error(`DragonSwap validation error: ${errorMessage}`);
             return false;
         }
     },
@@ -633,7 +633,7 @@ export const dragonSwapTradeAction: Action = {
 
         } catch (error: unknown) {
             const errorMessage = getErrorMessage(error);
-            elizaLogger.error("DragonSwap trade error:", errorMessage);
+            elizaLogger.error(`DragonSwap trade error: ${errorMessage}`);
             
             if (callback) {
                 callback({

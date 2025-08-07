@@ -239,7 +239,7 @@ export async function validateSeiConfig(runtime: any): Promise<SeiConfig> {
     elizaLogger.log("SEI configuration validated successfully");
     return config;
   } catch (error) {
-    elizaLogger.error("SEI configuration validation failed:", error);
+    elizaLogger.error(`SEI configuration validation failed: ${error}`);
     throw error;
   }
 }

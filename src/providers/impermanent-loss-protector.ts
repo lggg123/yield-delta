@@ -51,7 +51,7 @@ export class ImpermanentLossProtector {
         return this.createRebalanceOnlyStrategy(position, ilRisk);
       }
     } catch (error) {
-      elizaLogger.error('Failed to protect liquidity position:', error);
+      elizaLogger.error(`Failed to protect liquidity position:: ${error}`);
       throw error;
     }
   }
@@ -113,7 +113,7 @@ export class ImpermanentLossProtector {
         return this.createRebalanceOnlyStrategy(position, ilRisk);
       }
     } catch (error) {
-      elizaLogger.error('Perps hedge execution failed:', error);
+      elizaLogger.error(`Perps hedge execution failed:: ${error}`);
       return this.createRebalanceOnlyStrategy(position, ilRisk);
     }
   }
@@ -201,7 +201,7 @@ export class BasicILRiskCalculator implements ILRiskCalculator {
         riskLevel,
       };
     } catch (error) {
-      elizaLogger.error('Risk calculation failed:', error);
+      elizaLogger.error(`Risk calculation failed:: ${error}`);
       // Return default medium risk
       return {
         volatility: 0.5,

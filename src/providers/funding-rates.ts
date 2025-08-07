@@ -51,7 +51,7 @@ export class FundingRateProvider {
             default: return null;
           }
         } catch (error) {
-          elizaLogger.error(`Error fetching from ${exchange}:`, error);
+          elizaLogger.error(`Error fetching from ${exchange}:: ${error}`);
           return null;
         }
       });
@@ -63,7 +63,7 @@ export class FundingRateProvider {
         if (result.status === 'fulfilled' && result.value) {
           fundingRates.push(result.value);
         } else {
-          elizaLogger.warn(`Failed to fetch from ${exchanges[index]}:`, result.status === 'rejected' ? result.reason : 'No data');
+          elizaLogger.warn(`Failed to fetch from ${exchanges[index]}:: ${result.status === 'rejected' ? result.reason : 'No data'}`);
         }
       });
 
@@ -71,7 +71,7 @@ export class FundingRateProvider {
       return fundingRates;
 
     } catch (error) {
-      elizaLogger.error("Error fetching funding rates:", error);
+      elizaLogger.error(`Error fetching funding rates:: ${error}`);
       return [];
     }
   }
@@ -134,7 +134,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("Binance funding rate fetch failed:", error);
+      elizaLogger.error(`Binance funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -161,7 +161,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("Bybit funding rate fetch failed:", error);
+      elizaLogger.error(`Bybit funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -188,7 +188,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("BitMEX funding rate fetch failed:", error);
+      elizaLogger.error(`BitMEX funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -214,7 +214,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("Huobi funding rate fetch failed:", error);
+      elizaLogger.error(`Huobi funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -252,7 +252,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("Hyperliquid funding rate fetch failed:", error);
+      elizaLogger.error(`Hyperliquid funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -279,7 +279,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("Kraken funding rate fetch failed:", error);
+      elizaLogger.error(`Kraken funding rate fetch failed:: ${error}`);
       return null;
     }
   }
@@ -305,7 +305,7 @@ export class FundingRateProvider {
       }
       return null;
     } catch (error) {
-      elizaLogger.error("WooX funding rate fetch failed:", error);
+      elizaLogger.error(`WooX funding rate fetch failed:: ${error}`);
       return null;
     }
   }

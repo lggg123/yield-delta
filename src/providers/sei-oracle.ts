@@ -100,7 +100,7 @@ export class SeiOracleProvider {
       
       return null;
     } catch (error) {
-      elizaLogger.error("Oracle provider error:", error);
+      elizaLogger.error(`Oracle provider error: ${error}`);
       return null;
     }
   }
@@ -181,7 +181,7 @@ export class SeiOracleProvider {
             };
           }
         } catch (error) {
-          elizaLogger.warn(`YEI oracle failed for ${symbol}, falling back to other oracles:`, error);
+          elizaLogger.warn(`YEI oracle failed for ${symbol}, falling back to other oracles: ${error}`);
         }
       }
       
@@ -205,7 +205,7 @@ export class SeiOracleProvider {
 
       return null;
     } catch (error) {
-      elizaLogger.error(`Failed to get price for ${symbol}:`, error);
+      elizaLogger.error(`Failed to get price for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -253,7 +253,7 @@ export class SeiOracleProvider {
 
       return validRates;
     } catch (error) {
-      elizaLogger.error(`Failed to get funding rates for ${symbol}:`, error);
+      elizaLogger.error(`Failed to get funding rates for ${symbol}: ${error}`);
       return [];
     }
   }
@@ -308,7 +308,7 @@ export class SeiOracleProvider {
         confidence
       };
     } catch (error) {
-      elizaLogger.error(`Pyth price fetch error for ${symbol}:`, error);
+      elizaLogger.error(`Pyth price fetch error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -361,7 +361,7 @@ export class SeiOracleProvider {
         confidence: 0.99
       };
     } catch (error) {
-      elizaLogger.error(`Chainlink price fetch error for ${symbol}:`, error);
+      elizaLogger.error(`Chainlink price fetch error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -398,7 +398,7 @@ export class SeiOracleProvider {
 
       return null;
     } catch (error) {
-      elizaLogger.error(`CEX price fetch error for ${symbol}:`, error);
+      elizaLogger.error(`CEX price fetch error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -422,7 +422,7 @@ export class SeiOracleProvider {
 
       return null;
     } catch (error) {
-      elizaLogger.error(`Binance funding rate error for ${symbol}:`, error);
+      elizaLogger.error(`Binance funding rate error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -448,7 +448,7 @@ export class SeiOracleProvider {
 
       return null;
     } catch (error) {
-      elizaLogger.error(`Bybit funding rate error for ${symbol}:`, error);
+      elizaLogger.error(`Bybit funding rate error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -474,7 +474,7 @@ export class SeiOracleProvider {
 
       return null;
     } catch (error) {
-      elizaLogger.error(`OKX funding rate error for ${symbol}:`, error);
+      elizaLogger.error(`OKX funding rate error for ${symbol}: ${error}`);
       return null;
     }
   }
@@ -496,7 +496,7 @@ export class SeiOracleProvider {
         await Promise.all(symbols.map(symbol => this.getPrice(symbol)));
         await Promise.all(symbols.map(symbol => this.getFundingRates(symbol)));
       } catch (error) {
-        elizaLogger.error("Price update error:", error);
+        elizaLogger.error(`Price update error: ${error}`);
       }
     }, this.config.updateInterval * 1000);
   }
@@ -514,7 +514,7 @@ export class SeiOracleProvider {
         return api3Price;
       }
     } catch (error) {
-      elizaLogger.error(`YEI API3 price fetch failed for ${symbol}:`, error);
+      elizaLogger.error(`YEI API3 price fetch failed for ${symbol}: ${error}`);
     }
 
     // Priority 2: Pyth Network (Backup with 100+ publishers)
@@ -525,7 +525,7 @@ export class SeiOracleProvider {
         return pythPrice.price;
       }
     } catch (error) {
-      elizaLogger.error(`YEI Pyth price fetch failed for ${symbol}:`, error);
+      elizaLogger.error(`YEI Pyth price fetch failed for ${symbol}: ${error}`);
     }
 
     // Priority 3: Redstone Classic (USDT/USDC fallback)
@@ -536,7 +536,7 @@ export class SeiOracleProvider {
         return redstonePrice;
       }
     } catch (error) {
-      elizaLogger.error(`YEI Redstone price fetch failed for ${symbol}:`, error);
+      elizaLogger.error(`YEI Redstone price fetch failed for ${symbol}: ${error}`);
     }
 
     throw new Error(`All YEI oracle sources failed for ${symbol}`);

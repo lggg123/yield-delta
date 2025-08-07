@@ -16,10 +16,10 @@ beforeAll(() => {
     process.env.SEI_ADDRESS = '0xBFC122e34B01a0875301814958D0f47cA4153d7c';
   }
   if (!process.env.SEI_NETWORK) {
-    process.env.SEI_NETWORK = 'sei-testnet';
+    process.env.SEI_NETWORK = 'sei-devnet';
   }
   if (!process.env.SEI_RPC_URL) {
-    process.env.SEI_RPC_URL = 'https://evm-rpc-testnet.sei-apis.com';
+    process.env.SEI_RPC_URL = 'https://evm-rpc-arctic-1.sei-apis.com';
   }
   if (!process.env.DRAGONSWAP_API_URL) {
     process.env.DRAGONSWAP_API_URL = 'https://api-testnet.dragonswap.app/v1';

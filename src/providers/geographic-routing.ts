@@ -195,7 +195,7 @@ export class GeographicTradingRouter {
         };
       }
     } catch (error) {
-      elizaLogger.error('Geographic hedge execution failed:', error);
+      elizaLogger.error(`Geographic hedge execution failed:: ${error}`);
       return {
         success: false,
         provider: 'unknown',

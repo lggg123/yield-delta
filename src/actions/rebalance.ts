@@ -179,7 +179,7 @@ class PortfolioRebalancer {
       };
 
     } catch (error) {
-      elizaLogger.error('Portfolio analysis failed:', error);
+      elizaLogger.error(`Portfolio analysis failed:: ${error}`);
       throw error;
     }
   }
@@ -201,7 +201,7 @@ class PortfolioRebalancer {
 
       return results;
     } catch (error) {
-      elizaLogger.error('Portfolio rebalance failed:', error);
+      elizaLogger.error(`Portfolio rebalance failed:: ${error}`);
       throw error;
     }
   }
@@ -217,7 +217,7 @@ class PortfolioRebalancer {
       
       return `0x${Math.random().toString(16).substring(2, 66)}`; // Placeholder tx hash
     } catch (error) {
-      elizaLogger.error(`Failed to execute ${recommendation.action} for ${recommendation.asset}:`, error);
+      elizaLogger.error(`Failed to execute ${recommendation.action} for ${recommendation.asset}:: ${error}`);
       return null;
     }
   }
@@ -233,7 +233,7 @@ class PortfolioRebalancer {
       // This is a simplified implementation
       return Math.random() * 1000; // Placeholder
     } catch (error) {
-      elizaLogger.error(`Failed to get balance for ${symbol}:`, error);
+      elizaLogger.error(`Failed to get balance for ${symbol}:: ${error}`);
       return 0;
     }
   }
@@ -254,7 +254,7 @@ class PortfolioRebalancer {
 
       return balances;
     } catch (error) {
-      elizaLogger.error('Failed to get portfolio balances:', error);
+      elizaLogger.error(`Failed to get portfolio balances:: ${error}`);
       return {};
     }
   }
@@ -412,7 +412,7 @@ export const rebalanceEvaluatorAction: Action = {
       }
 
     } catch (error) {
-      elizaLogger.error("Portfolio rebalance analysis failed:", error);
+      elizaLogger.error(`Portfolio rebalance analysis failed:: ${error}`);
       if (callback) {
         callback({
           text: `❌ Portfolio analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

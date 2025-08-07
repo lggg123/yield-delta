@@ -8,8 +8,8 @@ function generateMockUUID(): UUID {
   return uuid as UUID;
 }
 
-// Mock viem to prevent actual blockchain calls
-vi.mock('viem', async () => {
+// Export viem mock factory for tests to use
+export async function createViemMocks(vi: any) {
   const actual = await vi.importActual('viem');
   return {
     ...actual,
@@ -91,7 +91,7 @@ vi.mock('viem', async () => {
       })
     }))
   };
-});
+}
 
 export function createMockMemory(text: string, entityId?: UUID): Memory {
   return {

@@ -87,7 +87,7 @@ describe('AMM-Specific Layer', () => {
   it('should rebalance all positions automatically', async () => {
     await manager.initPosition('ETH/USDC', 1800, 2200, 1000);
     await manager.initPosition('BTC/USDT', 29000, 31000, 500);
-    await manager.rebalanceAll({ 'ETH/USDC': 2250, 'BTC/USDT': 31500 }, 1, 0.1);
+    await manager.rebalanceAll({ 'ETH/USDC': 2250, 'BTC/USDT': 31700 }, 1, 0.1, 0.01);
     expect(manager.getAnalytics('ETH/USDC')).toEqual({ fees: 1, slippage: 0.1, rebalances: 1 });
     expect(manager.getAnalytics('BTC/USDT')).toEqual({ fees: 1, slippage: 0.1, rebalances: 1 });
     expect(rebalanceEvents).toEqual(['ETH/USDC', 'BTC/USDT']);

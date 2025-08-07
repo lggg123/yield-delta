@@ -110,7 +110,7 @@ class PerpsAPI {
       elizaLogger.log(`Position opened: ${txHash}`);
       return txHash;
     } catch (error) {
-      elizaLogger.error("Failed to open position:", error);
+      elizaLogger.error(`Failed to open position:: ${error}`);
       return null;
     }
   }
@@ -136,7 +136,7 @@ class PerpsAPI {
       elizaLogger.log(`Position closed: ${txHash}`);
       return txHash;
     } catch (error) {
-      elizaLogger.error("Failed to close position:", error);
+      elizaLogger.error(`Failed to close position:: ${error}`);
       return null;
     }
   }
@@ -149,7 +149,7 @@ class PerpsAPI {
       const data = await response.json();
       return data.positions || [];
     } catch (error) {
-      elizaLogger.error("Failed to get positions:", error);
+      elizaLogger.error(`Failed to get positions:: ${error}`);
       return [];
     }
   }
@@ -160,7 +160,7 @@ class PerpsAPI {
       if (!response.ok) return null;
       return await response.json();
     } catch (error) {
-      elizaLogger.error("Failed to get market info:", error);
+      elizaLogger.error(`Failed to get market info:: ${error}`);
       return null;
     }
   }
@@ -376,7 +376,7 @@ Your position is now active on SEI testnet.`,
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      elizaLogger.error("Error in perps trading:", error);
+      elizaLogger.error(`Error in perps trading:: ${error}`);
       
       const errorResponse = {
         text: `❌ Error executing perpetual trade: ${errorMessage}`,

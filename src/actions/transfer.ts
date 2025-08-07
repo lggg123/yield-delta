@@ -268,7 +268,7 @@ export const transferAction: Action = {
             );
         } catch (error: unknown) {
             const errorMessage = getErrorMessage(error);
-            elizaLogger.error("Transfer validation error:", errorMessage);
+            elizaLogger.error(`Transfer validation error: ${errorMessage}`);
             return false;
         }
     },
@@ -319,7 +319,7 @@ export const transferAction: Action = {
             
         } catch (error: unknown) {
             const errorMessage = getErrorMessage(error);
-            elizaLogger.error("Error during token transfer:", errorMessage);
+            elizaLogger.error(`Error during token transfer: ${errorMessage}`);
             
             if (callback) {
                 const errorResponse = {
@@ -411,7 +411,7 @@ async function buildTransferDetails(message: Memory, runtime: IAgentRuntime): Pr
         return params;
     } catch (error: unknown) {
         const errorMessage = getErrorMessage(error);
-        elizaLogger.error("Failed to build transfer details:", errorMessage);
+        elizaLogger.error(`Failed to build transfer details: ${errorMessage}`);
         throw new Error(`Transfer parameter parsing failed: ${errorMessage}`);
     }
 }
@@ -457,7 +457,7 @@ async function initWalletProvider(runtime: IAgentRuntime): Promise<WalletProvide
         return new WalletProvider(privateKey as `0x${string}`, chainWithName);
     } catch (error: unknown) {
         const errorMessage = getErrorMessage(error);
-        elizaLogger.error("Failed to initialize wallet provider:", errorMessage);
+        elizaLogger.error(`Failed to initialize wallet provider: ${errorMessage}`);
         throw new Error(`Wallet provider initialization failed: ${errorMessage}`);
     }
 }

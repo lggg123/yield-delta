@@ -210,7 +210,7 @@ export const ilProtectionAction: Action = {
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      elizaLogger.error("Error in IL protection:", error);
+      elizaLogger.error(`Error in IL protection:: ${error}`);
       if (callback) {
         callback({
           text: `❌ Error setting up IL protection: ${errorMessage}`,

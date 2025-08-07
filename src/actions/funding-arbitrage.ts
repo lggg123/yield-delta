@@ -81,7 +81,7 @@ class FundingArbitrageEngine {
         }
       }
     } catch (error) {
-      elizaLogger.error("Error updating position P&L:", error);
+      elizaLogger.error(`Error updating position P&L:: ${error}`);
     }
   }
 
@@ -104,14 +104,14 @@ class FundingArbitrageEngine {
             opportunities.push(opportunity);
           }
         } catch (error) {
-          elizaLogger.error(`Error scanning ${symbol}:`, error);
+          elizaLogger.error(`Error scanning ${symbol}:: ${error}`);
         }
       }
       
       // Sort by expected return (highest first)
       return opportunities.sort((a, b) => b.expectedReturn - a.expectedReturn);
     } catch (error) {
-      elizaLogger.error("Error scanning opportunities:", error);
+      elizaLogger.error(`Error scanning opportunities:: ${error}`);
       return [];
     }
   }
@@ -142,7 +142,7 @@ class FundingArbitrageEngine {
       const success = await this.openArbitragePosition(opportunity);
       return success;
     } catch (error) {
-      elizaLogger.error(`Error executing arbitrage for ${symbol}:`, error);
+      elizaLogger.error(`Error executing arbitrage for ${symbol}:: ${error}`);
       return false;
     }
   }
@@ -168,7 +168,7 @@ class FundingArbitrageEngine {
         }
       ];
     } catch (error) {
-      elizaLogger.error(`Error fetching funding rates for ${symbol}:`, error);
+      elizaLogger.error(`Error fetching funding rates for ${symbol}:: ${error}`);
       return [];
     }
   }
@@ -205,7 +205,7 @@ class FundingArbitrageEngine {
         confidence: Math.min(highestRate.confidence, lowestRate.confidence)
       };
     } catch (error) {
-      elizaLogger.error(`Error evaluating opportunity for ${symbol}:`, error);
+      elizaLogger.error(`Error evaluating opportunity for ${symbol}:: ${error}`);
       return null;
     }
   }
@@ -241,7 +241,7 @@ class FundingArbitrageEngine {
       elizaLogger.log(`Successfully opened arbitrage position: ${positionId}`);
       return true;
     } catch (error) {
-      elizaLogger.error("Error opening arbitrage position:", error);
+      elizaLogger.error(`Error opening arbitrage position:: ${error}`);
       return false;
     }
   }
@@ -265,7 +265,7 @@ class FundingArbitrageEngine {
           elizaLogger.log(`Successfully opened short position for ${opportunity.symbol}`);
           return true;
         } catch (perpsError) {
-          elizaLogger.error("Perps execution failed:", perpsError);
+          elizaLogger.error(`Perps execution failed:: ${perpsError}`);
           return false;
         }
       } else {
@@ -285,12 +285,12 @@ class FundingArbitrageEngine {
           elizaLogger.log(`Successfully swapped USDC for ${opportunity.symbol}`);
           return true;
         } catch (swapError) {
-          elizaLogger.error("DragonSwap execution failed:", swapError);
+          elizaLogger.error(`DragonSwap execution failed:: ${swapError}`);
           return false;
         }
       }
     } catch (error) {
-      elizaLogger.error("Failed to open hedge position:", error);
+      elizaLogger.error(`Failed to open hedge position:: ${error}`);
       return false;
     }
   }
@@ -312,7 +312,7 @@ class FundingArbitrageEngine {
       elizaLogger.log(`Successfully closed arbitrage position: ${positionId}`);
       return true;
     } catch (error) {
-      elizaLogger.error("Failed to close arbitrage position:", error);
+      elizaLogger.error(`Failed to close arbitrage position:: ${error}`);
       return false;
     }
   }
@@ -334,7 +334,7 @@ async function getOrCreateArbitrageEngine(runtime: IAgentRuntime): Promise<Fundi
     
     return new FundingArbitrageEngine(walletProvider, oracleProvider, runtime);
   } catch (error) {
-    elizaLogger.error("Failed to create arbitrage engine:", error);
+    elizaLogger.error(`Failed to create arbitrage engine:: ${error}`);
     throw error;
   }
 }
@@ -531,7 +531,7 @@ export const fundingArbitrageAction: Action = {
         
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        elizaLogger.error("Funding arbitrage error:", errorMessage);
+        elizaLogger.error(`Funding arbitrage error:: ${errorMessage}`);
         
         if (callback) {
             await callback({

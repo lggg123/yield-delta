@@ -83,7 +83,7 @@ export class DragonSwapProvider {
       }
       return await response.json();
     } catch (error) {
-      elizaLogger.error("Failed to get DragonSwap pool info:", error);
+      elizaLogger.error(`Failed to get DragonSwap pool info:: ${error}`);
       return null;
     }
   }
@@ -123,7 +123,7 @@ export class DragonSwapProvider {
         gasEstimate: data.gasEstimate || "200000"
       };
     } catch (error) {
-      elizaLogger.error("Failed to get DragonSwap quote:", error);
+      elizaLogger.error(`Failed to get DragonSwap quote:: ${error}`);
       return null;
     }
   }
@@ -186,7 +186,7 @@ export class DragonSwapProvider {
       
       return txHash;
     } catch (error) {
-      elizaLogger.error("DragonSwap execution failed:", error);
+      elizaLogger.error(`DragonSwap execution failed:: ${error}`);
       throw error;
     }
   }
@@ -203,7 +203,7 @@ export class DragonSwapProvider {
       }
       return await response.json();
     } catch (error) {
-      elizaLogger.error("Failed to get DragonSwap supported tokens:", error);
+      elizaLogger.error(`Failed to get DragonSwap supported tokens:: ${error}`);
       return {};
     }
   }
@@ -226,7 +226,7 @@ export class DragonSwapProvider {
         token1Reserve: "0"  // Would need to fetch from contract
       };
     } catch (error) {
-      elizaLogger.error("Failed to get DragonSwap liquidity:", error);
+      elizaLogger.error(`Failed to get DragonSwap liquidity:: ${error}`);
       return null;
     }
   }
@@ -246,7 +246,7 @@ export class DragonSwapProvider {
       // Consider high price impact as insufficient liquidity
       return quote.priceImpact > 5; // 5% threshold
     } catch (error) {
-      elizaLogger.error("Failed to check DragonSwap liquidity:", error);
+      elizaLogger.error(`Failed to check DragonSwap liquidity:: ${error}`);
       return true;
     }
   }
@@ -286,7 +286,7 @@ export class DragonSwapProvider {
       const isNativeSwap = tokenIn.toLowerCase() === '0x0' || tokenOut.toLowerCase() === '0x0';
       return isNativeSwap ? "150000" : "200000";
     } catch (error) {
-      elizaLogger.error("Failed to estimate DragonSwap gas:", error);
+      elizaLogger.error(`Failed to estimate DragonSwap gas:: ${error}`);
       return "250000"; // Safe fallback
     }
   }
@@ -302,7 +302,7 @@ export class DragonSwapProvider {
       }
       return "1000000000";
     } catch (error) {
-      elizaLogger.error("Failed to get gas price:", error);
+      elizaLogger.error(`Failed to get gas price:: ${error}`);
       return "1000000000";
     }
   }
@@ -322,7 +322,7 @@ export class DragonSwapProvider {
       const poolInfo = await this.getPoolInfo(tokenA, tokenB);
       return poolInfo?.fee || 0.003; // 0.3% default
     } catch (error) {
-      elizaLogger.error("Failed to get DragonSwap trading fee:", error);
+      elizaLogger.error(`Failed to get DragonSwap trading fee:: ${error}`);
       return 0.003; // Default 0.3%
     }
   }
