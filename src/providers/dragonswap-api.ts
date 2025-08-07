@@ -266,7 +266,7 @@ export class DragonSwapProvider {
     // 2. Handle different swap types (ETH vs ERC20)
     // 3. Properly encode the path array
     
-    elizaLogger.log("Building DragonSwap swap calldata", params);
+    elizaLogger.log(`Building DragonSwap swap calldata for ${params.amountIn} of token ${params.tokenIn}`);
     
     // Mock calldata - in real implementation, use proper ABI encoding
     return "0x38ed173900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002" as `0x${string}`;

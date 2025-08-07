@@ -15,7 +15,7 @@ export async function createViemMocks(vi: any) {
     ...actual,
     // Mock the createPublicClient to return our mock
     createPublicClient: vi.fn(() => ({
-      readContract: vi.fn().mockImplementation(({ functionName, args }) => {
+      readContract: vi.fn().mockImplementation(({ functionName }: { functionName: string; args?: unknown[] }) => {
         // Mock contract responses based on function name
         switch (functionName) {
           case 'queryPriceFeed':
@@ -71,7 +71,7 @@ export async function createViemMocks(vi: any) {
     })),
     // Mock HTTP transport to prevent real network calls
     http: vi.fn(() => ({
-      request: vi.fn().mockImplementation(({ body }) => {
+      request: vi.fn().mockImplementation(({ body }: { body?: { method?: string } }) => {
         const method = body?.method || '';
         switch (method) {
           case 'eth_getBalance':
