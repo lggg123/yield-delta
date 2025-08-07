@@ -148,11 +148,18 @@ export function createMockRuntime() {
         'SEI_NETWORK': 'sei-testnet',
         'SEI_RPC_URL': 'https://evm-rpc-testnet.sei-apis.com',
         'DRAGONSWAP_API_URL': 'https://api-testnet.dragonswap.app/v1',
-        'ORACLE_API_KEY': 'test-oracle-key'
+        'ORACLE_API_KEY': 'test-oracle-key',
+        'AI_ENGINE_URL': 'http://localhost:8000'
       };
       
       return fallbacks[key] || null;
     }),
+    seiClobProvider: {
+      placeRangeOrder: vi.fn().mockResolvedValue({ success: true, orderId: 'mock-order-123' }),
+      cancelOrder: vi.fn().mockResolvedValue({ success: true }),
+      getPositions: vi.fn().mockResolvedValue([]),
+      getOrderbook: vi.fn().mockResolvedValue({ bids: [], asks: [] })
+    },
     cacheManager: {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),

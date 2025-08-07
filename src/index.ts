@@ -11,6 +11,7 @@ import { rebalanceEvaluatorAction } from "./actions/rebalance";
 import { yeiFinanceAction } from './actions/yei-finance';
 import { ilProtectionAction } from "./actions/il-protection";
 import { ammOptimizeAction } from './actions/amm-optimize';
+import { deltaNeutralAction } from './actions/delta-neutral';
 import { ammRiskEvaluator } from './evaluators/amm-risk';
 import { AMMManagerProvider } from './providers/amm-manager';
 
@@ -38,7 +39,8 @@ export const seiYieldDeltaPlugin: Plugin = {
         rebalanceEvaluatorAction,
         yeiFinanceAction,
         ilProtectionAction,
-        ammOptimizeAction
+        ammOptimizeAction,
+        deltaNeutralAction
     ],
     evaluators: [
         ammRiskEvaluator
@@ -59,7 +61,8 @@ export {
     rebalanceEvaluatorAction,
     yeiFinanceAction,
     ilProtectionAction,
-    ammOptimizeAction
+    ammOptimizeAction,
+    deltaNeutralAction
 };
 
 // Export providers
