@@ -92,7 +92,7 @@ class DragonSwapAPI {
         }
         return null;
       }
-      return await response.json();
+      return await response.json() as DragonSwapPoolInfo;
     } catch (error) {
       elizaLogger.error("Failed to get pool info:", error);
       // In test environment, return mock pool info for errors
@@ -139,7 +139,7 @@ class DragonSwapAPI {
         }
         return null;
       }
-      return await response.json();
+      return await response.json() as { amountOut: string; priceImpact: number };
     } catch (error) {
       elizaLogger.error("Failed to get quote:", error);
       // In test environment, return mock quote for errors

@@ -1,4 +1,12 @@
-import type { Token } from "@lifi/types";
+// Basic token interface to replace @lifi/types dependency
+export interface Token {
+    chainId: number;
+    address: string;
+    symbol: string;
+    name: string;
+    decimals: number;
+    logoURI?: string;
+}
 import type {
     Account,
     Address,
@@ -11,7 +19,8 @@ import type {
 import * as viemChains from "viem/chains";
 export * from "./precompiles"
 
-const _SupportedChainList = Object.keys([viemChains.seiDevnet, viemChains.seiTestnet, viemChains.sei]) as Array<
+// Supported chain list for reference
+export const SupportedChainList = Object.keys([viemChains.seiDevnet, viemChains.seiTestnet, viemChains.sei]) as Array<
     keyof typeof viemChains
 >;
 

@@ -264,7 +264,7 @@ export class SeiOracleProvider {
       if (!feedId) return null;
 
       const publicClient = createPublicClient({
-        chain: seiChains.mainnet,
+        chain: seiChains.devnet,
         transport: http()
       });
 
@@ -285,7 +285,7 @@ export class SeiOracleProvider {
         ] as const,
         functionName: 'queryPriceFeed',
         args: [feedId as `0x${string}`]
-      });
+      }) as readonly [bigint, bigint, number, bigint];
 
       if (!result || result[0] === BigInt(0)) {
         return null; // Invalid price data
@@ -319,7 +319,7 @@ export class SeiOracleProvider {
       if (!feedAddress) return null;
 
       const publicClient = createPublicClient({
-        chain: seiChains.mainnet,
+        chain: seiChains.devnet,
         transport: http()
       });
 
@@ -339,7 +339,7 @@ export class SeiOracleProvider {
           }
         ] as const,
         functionName: 'latestRoundData'
-      });
+      }) as readonly [bigint, bigint, bigint, bigint, bigint];
 
       if (!result || result[1] === BigInt(0)) {
         return null; // Invalid price data
@@ -379,7 +379,7 @@ export class SeiOracleProvider {
       );
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { price: string };
         const price = parseFloat(data.price);
         
         // Validate price data
@@ -410,7 +410,7 @@ export class SeiOracleProvider {
       );
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { lastFundingRate: string; nextFundingTime: string };
         return {
           symbol,
           rate: parseFloat(data.lastFundingRate) * 8760, // Convert to annual
@@ -434,7 +434,7 @@ export class SeiOracleProvider {
       );
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { result: { list: Array<{ fundingRate: string; nextFundingTime: string }> } };
         const ticker = data.result.list[0];
         
         return {
@@ -460,7 +460,7 @@ export class SeiOracleProvider {
       );
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { data: Array<{ fundingRate: string; fundingTime: string; nextFundingTime: string }> };
         const fundingData = data.data[0];
         
         return {

@@ -333,7 +333,7 @@ Your position is now active on SEI testnet.`,
       
       const walletProvider = new WalletProvider(
         config.SEI_PRIVATE_KEY as `0x${string}`,
-        { name: config.SEI_NETWORK || "testnet", chain: seiChains[config.SEI_NETWORK || "testnet"] }
+        { name: config.SEI_NETWORK || "sei-devnet", chain: seiChains["devnet"] }
       );
 
       const text = message.content?.text?.toLowerCase() || "";

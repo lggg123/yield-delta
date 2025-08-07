@@ -288,7 +288,7 @@ export const rebalanceEvaluatorAction: Action = {
       
       const walletProvider = new WalletProvider(
         config.SEI_PRIVATE_KEY as `0x${string}`,
-        { name: config.SEI_NETWORK || "testnet", chain: seiChains[config.SEI_NETWORK || "testnet"] }
+        { name: config.SEI_NETWORK || "sei-devnet", chain: seiChains["devnet"] }
       );
 
       const oracleProvider = new SeiOracleProvider(runtime);

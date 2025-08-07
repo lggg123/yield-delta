@@ -7,7 +7,7 @@ export const ammRiskEvaluator = {
   validate: async (runtime: any, positions: any) => {
     return Array.isArray(positions) && positions.length > 0;
   },
-  async handler(runtime: any, positions: any, _, __, callback: any) {
+  async handler(runtime: any, positions: any, _: any, __: any, callback: any) {
     const clob = runtime.seiClobProvider;
     const manager = new AMMLayerManager(clob);
     for (const p of positions) {

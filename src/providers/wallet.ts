@@ -25,7 +25,7 @@ import * as path from "node:path";
 
 import type { ChainWithName } from "../types";
 
-export const seiChains = {
+export const seiChains: Record<string, Chain> = {
     "mainnet": viemChains.sei,
     "testnet": viemChains.seiTestnet,
     "devnet": viemChains.seiDevnet,
@@ -220,7 +220,7 @@ export class WalletProvider {
         chainName: string,
         customRpcUrl?: string | null
     ): Chain {
-        const baseChain = seiChains[chainName];
+        const baseChain = seiChains[chainName as keyof typeof seiChains];
 
         if (!baseChain?.id) {
             throw new Error("Invalid chain name");
@@ -245,20 +245,28 @@ export class WalletProvider {
 const genChainFromRuntime = (
     runtime: IAgentRuntime
 ): ChainWithName => {
-    const sei_network = runtime.getSetting("SEI_NETWORK");
+    const sei_network = runtime.getSetting("SEI_NETWORK") || "sei-devnet";
     if (typeof sei_network !== "string") {
         throw new Error("SEI_NETWORK must be a string");
     }
 
+    // Map environment network names to wallet chain names
+    const networkMap: Record<string, keyof typeof seiChains> = {
+        "sei-mainnet": "mainnet",
+        "sei-testnet": "testnet", 
+        "sei-devnet": "devnet"
+    };
+    
+    const chainKey = networkMap[sei_network] || "devnet";
     const validChains = Object.keys(seiChains);
-    if (!validChains.includes(sei_network)) {
-        throw new Error(`Invalid SEI_NETWORK ${sei_network}. Must be one of ${validChains.join(", ")}`);
+    if (!validChains.includes(chainKey)) {
+        throw new Error(`Invalid SEI_NETWORK ${sei_network}. Must map to one of ${validChains.join(", ")}`);
     }
 
-    let chain = seiChains[sei_network];
+    let chain = seiChains[chainKey];
     const rpcurl = runtime.getSetting("SEI_RPC_URL");
     if (typeof rpcurl === "string") {
-        chain = WalletProvider.genSeiChainFromName(sei_network, rpcurl);
+        chain = WalletProvider.genSeiChainFromName(chainKey, rpcurl);
     }
 
     return { name: sei_network, chain: chain };

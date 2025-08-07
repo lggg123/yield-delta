@@ -90,7 +90,7 @@ export const seiChains: Record<SeiNetworkName, SeiChain> = {
   },
   "sei-devnet": {
     id: 713715,
-    name: "Sei Devnet",
+    name: "Sei Devnet", 
     network: "sei-devnet",
     nativeCurrency: {
       name: "SEI",
@@ -220,11 +220,11 @@ export async function validateSeiConfig(runtime: any): Promise<SeiConfig> {
     }
 
     const config: SeiConfig = {
-        SEI_RPC_URL: rpcUrl || 'https://evm-rpc-testnet.sei-apis.com',
+        SEI_RPC_URL: rpcUrl || 'https://evm-rpc-arctic-1.sei-apis.com',
         SEI_CHAIN_ID: chainId,
         SEI_PRIVATE_KEY: privateKey,
         SEI_ADDRESS: address,
-        SEI_NETWORK: network || "sei-testnet",
+        SEI_NETWORK: network || "sei-devnet",
         DRAGONSWAP_API_URL: dragonswapApiUrl,
         ORACLE_API_KEY: oracleApiKey,
         YEI_API_KEY: yeiApiKey,
@@ -249,9 +249,9 @@ export async function validateSeiConfig(runtime: any): Promise<SeiConfig> {
  */
 export function getTestSeiConfig(): SeiConfig {
   return {
-    SEI_RPC_URL: "https://evm-rpc-testnet.sei-apis.com",
+    SEI_RPC_URL: "https://evm-rpc-arctic-1.sei-apis.com",
     SEI_CHAIN_ID: "713715",
-    SEI_NETWORK: "sei-testnet",
+    SEI_NETWORK: "sei-devnet",
     DRAGONSWAP_API_URL: "https://api.dragonswap.app",
     ORACLE_API_KEY: "test-oracle-key",
     YEI_API_KEY: "test-yei-key",
@@ -286,7 +286,7 @@ export async function createSeiConfig(runtime?: any, rpcUrl?: string): Promise<S
   // Fallback configuration for testing
   return {
     SEI_RPC_URL: rpcUrl,
-    SEI_NETWORK: "sei-testnet" as SeiNetworkName,
+    SEI_NETWORK: "sei-devnet" as SeiNetworkName,
     USER_GEOGRAPHY: 'GLOBAL',
     PERP_PREFERENCE: 'AUTO',
     COINBASE_SANDBOX: true,
