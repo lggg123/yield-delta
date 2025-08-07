@@ -62,7 +62,19 @@ This strategy profits from volatility and fees while staying market-neutral.`,
         throw new Error(`AI optimization failed: ${response.status}`);
       }
 
-      const optimization = await response.json();
+      const optimization = await response.json() as {
+        hedge_ratio: number;
+        expected_neutrality: number;
+        expected_apr: number;
+        revenue_breakdown: {
+          lp_fees: number;
+          funding_rates: number;
+          volatility_capture: number;
+        };
+        lower_price: number;
+        upper_price: number;
+        reasoning: string;
+      };
 
       await callback({
         text: `🎯 **Delta Neutral Strategy Executed for ${pair}**

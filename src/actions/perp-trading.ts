@@ -146,7 +146,7 @@ class PerpsAPI {
       const response = await fetch(`${this.baseUrl}/positions/${address}`);
       if (!response.ok) return [];
       
-      const data = await response.json();
+      const data = await response.json() as { positions?: PerpsPosition[] };
       return data.positions || [];
     } catch (error) {
       elizaLogger.error(`Failed to get positions:: ${error}`);
