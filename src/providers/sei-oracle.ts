@@ -163,32 +163,52 @@ export class SeiOracleProvider {
       //   }
       // }
 
-      // Try multiple sources - YEI multi-oracle as priority for supported symbols
+      // **PRIORITY: Use deployed MockPriceFeed for testing**
       let price: PriceFeed | null = null;
       
-      // First try YEI Finance multi-oracle approach (for YEI-supported symbols)
-      const yeiSupportedSymbols = ['BTC', 'ETH', 'SEI', 'USDC', 'USDT'];
-      if (yeiSupportedSymbols.includes(symbol.toUpperCase())) {
-        try {
-          const yeiPrice = await this.getYeiPrice(symbol);
-          if (yeiPrice && yeiPrice > 0) {
-            price = {
-              symbol,
-              price: yeiPrice,
-              source: 'yei-multi-oracle',
-              timestamp: Date.now(),
-              confidence: 0.95 // High confidence for multi-oracle consensus
-            };
-          }
-        } catch (error) {
-          elizaLogger.warn(`YEI oracle failed for ${symbol}, falling back to other oracles: ${error}`);
+      // First try MockPriceFeed (deployed at 0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030)
+      try {
+        const mockPrice = await this.getMockPriceFeedPrice(symbol);
+        if (mockPrice && mockPrice > 0) {
+          price = {
+            symbol,
+            price: mockPrice,
+            source: 'mock-price-feed',
+            timestamp: Date.now(),
+            confidence: 0.99 // High confidence for testing
+          };
+          elizaLogger.info(`MockPriceFeed price for ${symbol}: $${mockPrice}`);
         }
+      } catch (error) {
+        elizaLogger.warn(`MockPriceFeed failed for ${symbol}, falling back to other oracles: ${error}`);
       }
       
-      // Fallback to existing oracle sources
-      if (!price) price = await this.getPythPrice(symbol);
-      if (!price) price = await this.getChainlinkPrice(symbol);
-      if (!price) price = await this.getCexPrice(symbol);
+      // Fallback to existing oracle sources only if MockPriceFeed fails
+      if (!price) {
+        // Try YEI Finance multi-oracle approach (for YEI-supported symbols)
+        const yeiSupportedSymbols = ['BTC', 'ETH', 'SEI', 'USDC', 'USDT'];
+        if (yeiSupportedSymbols.includes(symbol.toUpperCase())) {
+          try {
+            const yeiPrice = await this.getYeiPrice(symbol);
+            if (yeiPrice && yeiPrice > 0) {
+              price = {
+                symbol,
+                price: yeiPrice,
+                source: 'yei-multi-oracle',
+                timestamp: Date.now(),
+                confidence: 0.95 // High confidence for multi-oracle consensus
+              };
+            }
+          } catch (error) {
+            elizaLogger.warn(`YEI oracle failed for ${symbol}, falling back to other oracles: ${error}`);
+          }
+        }
+        
+        // Other fallbacks
+        if (!price) price = await this.getPythPrice(symbol);
+        if (!price) price = await this.getChainlinkPrice(symbol);
+        if (!price) price = await this.getCexPrice(symbol);
+      }
 
       if (price && !isNaN(price.price) && price.price > 0) {
         this.priceCache.set(symbol, price);
@@ -636,6 +656,61 @@ export class SeiOracleProvider {
     }
 
     return dApiId as `0x${string}`;
+  }
+
+  /**
+   * Get price from our deployed MockPriceFeed contract
+   */
+  private async getMockPriceFeedPrice(symbol: string): Promise<number> {
+    const mockPriceFeedAddress = '0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030';
+    
+    const publicClient = createPublicClient({
+      chain: seiChains.devnet,
+      transport: http()
+    });
+
+    // Map symbol to token address (using our deployed mock token for SEI)
+    const tokenAddresses: Record<string, string> = {
+      'SEI': '0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030', // Using mock token address
+      'USDC': '0x0000000000000000000000000000000000000001', // Placeholder
+      'ETH': '0x0000000000000000000000000000000000000002', // Placeholder
+      'BTC': '0x0000000000000000000000000000000000000003', // Placeholder
+    };
+
+    const tokenAddress = tokenAddresses[symbol.toUpperCase()];
+    if (!tokenAddress) {
+      throw new Error(`No token address configured for ${symbol}`);
+    }
+
+    try {
+      const result = await publicClient.readContract({
+        address: mockPriceFeedAddress as `0x${string}`,
+        abi: [
+          {
+            name: 'getPrice',
+            type: 'function',
+            inputs: [{ name: 'token', type: 'address' }],
+            outputs: [{ name: 'price', type: 'uint256' }],
+            stateMutability: 'view'
+          }
+        ] as const,
+        functionName: 'getPrice',
+        args: [tokenAddress as `0x${string}`]
+      }) as bigint;
+
+      // Convert from wei to standard decimal format
+      const price = Number(result) / 1e18;
+      
+      // Validate price data
+      if (isNaN(price) || price <= 0) {
+        throw new Error(`Invalid price data from MockPriceFeed for ${symbol}: ${price}`);
+      }
+
+      return price;
+    } catch (error) {
+      elizaLogger.error(`MockPriceFeed contract call failed for ${symbol}: ${error}`);
+      throw error;
+    }
   }
 
   /**
