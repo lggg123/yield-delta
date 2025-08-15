@@ -659,58 +659,27 @@ export class SeiOracleProvider {
   }
 
   /**
-   * Get price from our deployed MockPriceFeed contract
+   * Get price from mock data for testing (since MockPriceFeed deployment is having issues)
    */
   private async getMockPriceFeedPrice(symbol: string): Promise<number> {
-    const mockPriceFeedAddress = '0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030';
-    
-    const publicClient = createPublicClient({
-      chain: seiChains.devnet,
-      transport: http()
-    });
-
-    // Map symbol to token address (using our deployed mock token for SEI)
-    const tokenAddresses: Record<string, string> = {
-      'SEI': '0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030', // Using mock token address
-      'USDC': '0x0000000000000000000000000000000000000001', // Placeholder
-      'ETH': '0x0000000000000000000000000000000000000002', // Placeholder
-      'BTC': '0x0000000000000000000000000000000000000003', // Placeholder
+    // Return realistic mock prices for testing
+    const mockPrices: Record<string, number> = {
+      'SEI': 0.45,     // $0.45 per SEI
+      'USDC': 1.00,    // $1.00 per USDC
+      'USDT': 1.00,    // $1.00 per USDT
+      'ETH': 2500.00,  // $2,500 per ETH
+      'BTC': 45000.00, // $45,000 per BTC
+      'ATOM': 8.50,    // $8.50 per ATOM
+      'DAI': 1.00,     // $1.00 per DAI
     };
 
-    const tokenAddress = tokenAddresses[symbol.toUpperCase()];
-    if (!tokenAddress) {
-      throw new Error(`No token address configured for ${symbol}`);
+    const price = mockPrices[symbol.toUpperCase()];
+    if (!price) {
+      throw new Error(`No mock price configured for ${symbol}`);
     }
 
-    try {
-      const result = await publicClient.readContract({
-        address: mockPriceFeedAddress as `0x${string}`,
-        abi: [
-          {
-            name: 'getPrice',
-            type: 'function',
-            inputs: [{ name: 'token', type: 'address' }],
-            outputs: [{ name: 'price', type: 'uint256' }],
-            stateMutability: 'view'
-          }
-        ] as const,
-        functionName: 'getPrice',
-        args: [tokenAddress as `0x${string}`]
-      }) as bigint;
-
-      // Convert from wei to standard decimal format
-      const price = Number(result) / 1e18;
-      
-      // Validate price data
-      if (isNaN(price) || price <= 0) {
-        throw new Error(`Invalid price data from MockPriceFeed for ${symbol}: ${price}`);
-      }
-
-      return price;
-    } catch (error) {
-      elizaLogger.error(`MockPriceFeed contract call failed for ${symbol}: ${error}`);
-      throw error;
-    }
+    elizaLogger.info(`Mock price for ${symbol}: $${price}`);
+    return price;
   }
 
   /**
