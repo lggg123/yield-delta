@@ -166,7 +166,7 @@ export class SeiOracleProvider {
       // **PRIORITY: Use deployed MockPriceFeed for testing**
       let price: PriceFeed | null = null;
       
-      // First try MockPriceFeed (deployed at 0xB00d53a9738FcDeF6844f33F3F5D71Cf57438030)
+      // First try MockPriceFeed (deployed at 0x8438Ad1C834623CfF278AB6829a248E37C2D7E3f with SEI token at 0x2E983A1Ba5e8b38AAAeC4B440B9dDcFBf72E15d1)
       try {
         const mockPrice = await this.getMockPriceFeedPrice(symbol);
         if (mockPrice && mockPrice > 0) {
@@ -659,12 +659,51 @@ export class SeiOracleProvider {
   }
 
   /**
-   * Get price from mock data for testing (since MockPriceFeed deployment is having issues)
+   * Get price from deployed MockPriceFeed contract (0x8438Ad1C834623CfF278AB6829a248E37C2D7E3f)
+   * With fallback to hardcoded prices if contract call fails
    */
   private async getMockPriceFeedPrice(symbol: string): Promise<number> {
-    // Return realistic mock prices for testing
+    const tokenAddresses: Record<string, string> = {
+      'SEI': '0x2E983A1Ba5e8b38AAAeC4B440B9dDcFBf72E15d1', // Deployed SEI mock token
+      'USDC': '0x0000000000000000000000000000000000000000', // Placeholder for future deployment
+    };
+
+    try {
+      // First try calling the deployed MockPriceFeed contract
+      const tokenAddress = tokenAddresses[symbol.toUpperCase()];
+      if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
+        const publicClient = createPublicClient({
+          chain: seiChains.devnet,
+          transport: http()
+        });
+
+        const result = await publicClient.readContract({
+          address: '0x8438Ad1C834623CfF278AB6829a248E37C2D7E3f' as `0x${string}`, // New MockPriceFeed address
+          abi: [
+            {
+              name: 'getPrice',
+              type: 'function',
+              inputs: [{ name: 'token', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }]
+            }
+          ] as const,
+          functionName: 'getPrice',
+          args: [tokenAddress as `0x${string}`]
+        }) as bigint;
+
+        if (result && result > 0n) {
+          const price = Number(result) / 1e18; // Convert from wei to standard price
+          elizaLogger.info(`MockPriceFeed contract price for ${symbol}: $${price}`);
+          return price;
+        }
+      }
+    } catch (error) {
+      elizaLogger.warn(`MockPriceFeed contract call failed for ${symbol}: ${error}`);
+    }
+
+    // Fallback to hardcoded prices for testing
     const mockPrices: Record<string, number> = {
-      'SEI': 0.45,     // $0.45 per SEI
+      'SEI': 0.452,    // $0.452 per SEI (matches deployed contract)
       'USDC': 1.00,    // $1.00 per USDC
       'USDT': 1.00,    // $1.00 per USDT
       'ETH': 2500.00,  // $2,500 per ETH
@@ -678,7 +717,7 @@ export class SeiOracleProvider {
       throw new Error(`No mock price configured for ${symbol}`);
     }
 
-    elizaLogger.info(`Mock price for ${symbol}: $${price}`);
+    elizaLogger.info(`Mock fallback price for ${symbol}: $${price}`);
     return price;
   }
 
