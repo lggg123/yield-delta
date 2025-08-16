@@ -13,7 +13,7 @@ import { ilProtectionAction } from "./actions/il-protection";
 import { ammOptimizeAction } from './actions/amm-optimize';
 import { deltaNeutralAction } from './actions/delta-neutral';
 import { ammRiskEvaluator } from './evaluators/amm-risk';
-import { AMMManagerProvider } from './providers/amm-manager';
+import { AMMManagerProvider_Instance } from './providers/amm-manager';
 
 // Import utilities and types from environment
 import { 
@@ -48,7 +48,7 @@ export const seiYieldDeltaPlugin: Plugin = {
     providers: [
         evmWalletProvider as any,
         oracleProvider as any,
-        AMMManagerProvider as any
+        AMMManagerProvider_Instance as any
     ],
 };
 
@@ -69,7 +69,7 @@ export {
 export {
     evmWalletProvider,
     oracleProvider,
-    AMMManagerProvider
+    AMMManagerProvider_Instance
 };
 
 // Export provider classes
