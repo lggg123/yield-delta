@@ -123,7 +123,12 @@ class PortfolioRebalancer {
       const portfolioBalances = await this.getPortfolioBalances(walletAddress);
       const totalValue = Object.values(portfolioBalances).reduce((sum, value) => sum + value, 0);
 
+      elizaLogger.info(`DEBUG: Portfolio balances for ${walletAddress}:`, portfolioBalances);
+      elizaLogger.info(`DEBUG: Total portfolio value: ${totalValue}`);
+
       if (totalValue === 0) {
+        elizaLogger.error(`DEBUG: Portfolio analysis failed - no value found for ${walletAddress}`);
+        elizaLogger.error(`DEBUG: Portfolio balances were:`, portfolioBalances);
         throw new Error('Portfolio has no value');
       }
 
@@ -227,14 +232,14 @@ class PortfolioRebalancer {
       // Return test balances based on our known test user funding from deployment
       // Updated with latest deployed contract addresses
       const testBalances: Record<string, Record<string, number>> = {
-        // Updated test user addresses from latest deployment
-        '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': { // User1 - Balanced Portfolio
+        // Updated test user addresses from latest deployment (lowercase for consistent lookup)
+        '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': { // User1 - Balanced Portfolio
           'SEI': 10000, 'USDC': 10000, 'USDT': 5000, 'ETH': 100, 'BTC': 5, 'ATOM': 1000, 'DAI': 5000
         },
-        '0x90F79bf6EB2c4f870365E785982E1f101E93b906': { // User2 - Conservative Portfolio
+        '0x90f79bf6eb2c4f870365e785982e1f101e93b906': { // User2 - Conservative Portfolio
           'SEI': 5000, 'USDC': 5000, 'USDT': 2000, 'ETH': 25, 'BTC': 1, 'ATOM': 500, 'DAI': 3000
         },
-        '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65': { // User3 - Whale Portfolio
+        '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65': { // User3 - Whale Portfolio
           'SEI': 100000, 'USDC': 50000, 'USDT': 25000, 'ETH': 500, 'BTC': 20, 'ATOM': 10000, 'DAI': 30000
         },
         // Keep legacy addresses for backwards compatibility
@@ -249,10 +254,16 @@ class PortfolioRebalancer {
         }
       };
       
-      const userBalances = testBalances[address.toLowerCase()];
+      const addressLower = address.toLowerCase();
+      const userBalances = testBalances[addressLower];
       const tokenBalance = userBalances ? (userBalances[symbol] || 0) : 0;
       
-      elizaLogger.info(`Test balance for ${address} ${symbol}: ${tokenBalance}`);
+      elizaLogger.info(`DEBUG: Original address: ${address}`);
+      elizaLogger.info(`DEBUG: Lowercase address: ${addressLower}`);
+      elizaLogger.info(`DEBUG: Available test addresses:`, Object.keys(testBalances));
+      elizaLogger.info(`DEBUG: Address exists in testBalances:`, addressLower in testBalances);
+      elizaLogger.info(`DEBUG: Found user balances:`, userBalances);
+      elizaLogger.info(`DEBUG: Token balance for ${symbol}: ${tokenBalance}`);
       return tokenBalance;
     } catch (error) {
       elizaLogger.error(`Failed to get balance for ${symbol}:: ${error}`);
@@ -264,14 +275,36 @@ class PortfolioRebalancer {
     try {
       const balances: Record<string, number> = {};
 
+      // Mock prices for demo purposes (fallback if oracle fails)
+      const mockPrices: Record<string, number> = {
+        'SEI': 0.45,
+        'USDC': 1.00, 
+        'USDT': 1.00,
+        'ETH': 2800.00,
+        'BTC': 68000.00,
+        'ATOM': 9.50,
+        'DAI': 1.00,
+        'OSMO': 0.78
+      };
+
       // Get asset prices individually
-      const symbols = ['SEI', 'USDC', 'ETH', 'BTC', 'ATOM', 'OSMO'];
+      const symbols = ['SEI', 'USDC', 'USDT', 'ETH', 'BTC', 'ATOM', 'DAI', 'OSMO'];
       for (const symbol of symbols) {
-        const priceFeed = await this.oracleProvider.getPrice(symbol);
-        const price = priceFeed ? priceFeed.price : 0;
+        let price = mockPrices[symbol] || 0;
+        
+        try {
+          const priceFeed = await this.oracleProvider.getPrice(symbol);
+          if (priceFeed && priceFeed.price > 0) {
+            price = priceFeed.price;
+          }
+        } catch (error) {
+          elizaLogger.warn(`Using mock price for ${symbol}: ${price}`);
+        }
         
         const balance = await this.getAssetBalance(symbol, walletAddress);
         balances[symbol] = balance * price;
+        
+        elizaLogger.info(`Portfolio balance for ${symbol}: ${balance} tokens × $${price} = $${balances[symbol]}`);
       }
 
       return balances;
