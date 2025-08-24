@@ -225,7 +225,19 @@ class PortfolioRebalancer {
   private async getAssetBalance(symbol: string, address: string): Promise<number> {
     try {
       // Return test balances based on our known test user funding from deployment
+      // Updated with latest deployed contract addresses
       const testBalances: Record<string, Record<string, number>> = {
+        // Updated test user addresses from latest deployment
+        '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': { // User1 - Balanced Portfolio
+          'SEI': 10000, 'USDC': 10000, 'USDT': 5000, 'ETH': 100, 'BTC': 5, 'ATOM': 1000, 'DAI': 5000
+        },
+        '0x90F79bf6EB2c4f870365E785982E1f101E93b906': { // User2 - Conservative Portfolio
+          'SEI': 5000, 'USDC': 5000, 'USDT': 2000, 'ETH': 25, 'BTC': 1, 'ATOM': 500, 'DAI': 3000
+        },
+        '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65': { // User3 - Whale Portfolio
+          'SEI': 100000, 'USDC': 50000, 'USDT': 25000, 'ETH': 500, 'BTC': 20, 'ATOM': 10000, 'DAI': 30000
+        },
+        // Keep legacy addresses for backwards compatibility
         '0x2222222222222222222222222222222222222222': {
           'SEI': 10000, 'USDC': 10000, 'USDT': 5000, 'ETH': 100, 'BTC': 5, 'ATOM': 1000, 'DAI': 5000
         },
@@ -318,7 +330,7 @@ export const rebalanceEvaluatorAction: Action = {
       const addressMatch = text.match(/(?:wallet|address)[:\s]+(0x[a-fA-F0-9]{40})/i);
       const walletAddress = addressMatch 
         ? addressMatch[1] 
-        : "0x2222222222222222222222222222222222222222"; // Default to test user for demo
+        : "0x4199f86f3bd73cf6ae5e89c8e28863d4b12fb18e"; // Default to updated test user (AIOracle contract) for demo
 
       if (callback) {
         callback({
