@@ -330,7 +330,7 @@ export const rebalanceEvaluatorAction: Action = {
       const addressMatch = text.match(/(?:wallet|address)[:\s]+(0x[a-fA-F0-9]{40})/i);
       const walletAddress = addressMatch 
         ? addressMatch[1] 
-        : "0x4199f86f3bd73cf6ae5e89c8e28863d4b12fb18e"; // Default to updated test user (AIOracle contract) for demo
+        : "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"; // Default to User1 from updated deployment config
 
       if (callback) {
         callback({
